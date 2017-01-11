@@ -2,6 +2,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cassert>
+#include <set>
 
 #include "icode.h"
 
@@ -278,6 +280,8 @@ Program::Program (FILE *in):
 	}
 	if (!instr.back())
 		instr.pop_back();
+
+        find_functions();
 }
 
 void Program::icode (FILE *out)
@@ -311,4 +315,77 @@ void Program::ccode (FILE *out)
 		p->ccode(out);
 
 	fprintf(out,"void main()\n{\n\t(*entry)();\n}\n");
+}
+
+void Program::find_functions()
+{
+    int enter = -1;
+
+    for (int i = 1; i < instr.size(); ++i) {
+        if (instr[i].op == Opcode::ENTER) {
+            assert(enter == -1);
+            enter = i;
+
+        } else if (instr[i].op == Opcode::RET) {
+            assert(enter > 0);
+            funcs.push_back(new Function(this, enter, i));
+            enter = -1;
+        }
+    }
+}
+
+Program::~Program()
+{
+    for (Function* func : funcs)
+        delete func;
+}
+
+Function::Function(Program* prog, int enter, int exit)
+    : prog(prog)
+{
+    assert(prog->instr[enter].op == Opcode::ENTER);
+    frame_size = prog->instr[enter].oper1.value;
+    is_main = prog->instr[enter - 1].op == Opcode::ENTRYPC;
+
+    std::set<int> bounds;  // boundaries of blocks
+
+    for (int i = enter + 1; i <= exit; ++i) {
+        int br = prog->instr[i].get_branch_target();
+        if (br != -1)
+            bounds.insert(i + 1);
+        if (br > 0)
+            bounds.insert(br);
+    }
+
+    int begin = enter + 1;
+    for (int end : bounds) {
+        auto it = prog->instr.cbegin();
+        blocks[begin] = new Block(this, std::vector<Instruction>(it + begin, it + end));
+        begin = end;
+    }
+
+    begin = enter + 1;
+    for (int end : bounds) {
+        Block* b = blocks[begin];
+
+        Opcode::Type op = b->instr.back().op;
+        b->seq_next = (op != Opcode::BR && op != Opcode::RET) ? blocks[end] : nullptr;
+
+        int br = b->instr.back().get_branch_target();
+        b->br_next = (br > 0) ? blocks[br] : nullptr;
+
+        begin = end;
+    }
+}
+
+Function::~Function()
+{
+    for (const auto& iter : blocks)
+        delete iter.second;
+}
+
+Block::Block(Function* func, std::vector<Instruction> instr_)
+    : func(func)
+{
+    instr.swap(instr_);
 }

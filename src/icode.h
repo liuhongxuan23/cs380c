@@ -1,6 +1,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 struct Opcode {
 	enum Type {
@@ -57,10 +58,42 @@ struct Instruction {
         int get_branch_target () const;
 };
 
+class Function;
+class Program;
+
+class Block {
+public:
+    Block(Function* func, std::vector<Instruction> instr);
+
+    Function* func;
+    Block* seq_next = nullptr;
+    Block* br_next = nullptr;
+    std::vector<Instruction> instr;
+};
+
+class Function {
+public:
+    Function(Program* parent, int enter, int exit);
+    ~Function();
+
+    Program* prog;
+    int frame_size;
+    bool is_main;
+    std::map<int, Block*> blocks;
+
+private:
+    void find_basic_blocks();
+};
+
 struct Program {
 	std::vector<Instruction> instr;
+        std::vector<Function*> funcs;
         Program () { instr.push_back(Instruction()); }
 	Program (FILE *in);
+        ~Program ();
 	void icode (FILE *out);
 	void ccode (FILE *out);
-};;
+
+private:
+        void find_functions();
+};
