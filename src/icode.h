@@ -1,6 +1,7 @@
 
 #include <string>
 #include <vector>
+#include <list>
 #include <map>
 
 struct Opcode {
@@ -24,7 +25,7 @@ struct Opcode {
 
 	Opcode (): type(UNKNOWN) {}
 	Opcode (const char *name);
-	operator Type() { return type; }
+	operator Type() const { return type; }
 
 	const char *name() const { return opname[type]; }
 	int operands() const { return operand_count[type]; }
@@ -56,6 +57,7 @@ struct Instruction {
 	void ccode (FILE *out);
 	operator bool() { return bool(op); }
         int get_branch_target () const;
+	int get_next_instr() const;
 };
 
 class Function;
@@ -69,6 +71,9 @@ public:
     Block* seq_next = nullptr;
     Block* br_next = nullptr;
     std::vector<Instruction> instr;
+    std::list<Block*> prevs;
+    Block *domf = NULL;
+    std::list<Block*> domc;
 };
 
 class Function {
@@ -80,9 +85,9 @@ public:
     int frame_size;
     bool is_main;
     std::map<int, Block*> blocks;
+    Block* entry;
 
-private:
-    void find_basic_blocks();
+    void build_domtree();
 };
 
 struct Program {
@@ -93,7 +98,6 @@ struct Program {
         ~Program ();
 	void icode (FILE *out);
 	void ccode (FILE *out);
-
-private:
         void find_functions();
+	void build_domtree();
 };

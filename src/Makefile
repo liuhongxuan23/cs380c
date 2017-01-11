@@ -3,11 +3,13 @@ CXXFLAGS=-std=gnu++11 -g
 
 .PHONY: all
 
-all: lab1 cfg
+all: ccode cfg dom
 
-lab1: icode.o lab1.o
+ccode: icode.o ccode.o
 
 cfg: icode.o cfg.o
+
+dom: icode.o dom.o
 
 clean:
 	-rm *.o

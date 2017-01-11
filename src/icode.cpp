@@ -272,6 +272,14 @@ int Instruction::get_branch_target () const
 	return -1;
 }
 
+int Instruction::get_next_instr() const
+{
+	if (op == Opcode::BR || op == Opcode::RET)
+		return -1;
+	else
+		return addr + 1;
+}
+
 Program::Program (FILE *in):
 	Program()
 {
@@ -280,13 +288,11 @@ Program::Program (FILE *in):
 	}
 	if (!instr.back())
 		instr.pop_back();
-
-        find_functions();
 }
 
 void Program::icode (FILE *out)
 {
-	for (auto p = instr.begin(); p != instr.end(); ++p)
+	for (auto p = ++instr.begin(); p != instr.end(); ++p)
 		p->icode(out);
 }
 
@@ -311,7 +317,7 @@ void Program::ccode (FILE *out)
 	);
 
 
-	for (auto p = instr.begin(); p != instr.end(); ++p)
+	for (auto p = ++instr.begin(); p != instr.end(); ++p)
 		p->ccode(out);
 
 	fprintf(out,"void main()\n{\n\t(*entry)();\n}\n");
@@ -334,6 +340,12 @@ void Program::find_functions()
     }
 }
 
+void Program::build_domtree()
+{
+	for (Function *f: funcs)
+		f->build_domtree();
+}
+
 Program::~Program()
 {
     for (Function* func : funcs)
@@ -349,30 +361,35 @@ Function::Function(Program* prog, int enter, int exit)
 
     std::set<int> bounds;  // boundaries of blocks
 
-    for (int i = enter + 1; i <= exit; ++i) {
+    for (int i = enter; i <= exit; ++i) {
         int br = prog->instr[i].get_branch_target();
-        if (br != -1)
+        if (br != -1 || prog->instr[i].op == Opcode::CALL)
             bounds.insert(i + 1);
         if (br > 0)
             bounds.insert(br);
     }
 
-    int begin = enter + 1;
+    int begin = enter;
     for (int end : bounds) {
         auto it = prog->instr.cbegin();
         blocks[begin] = new Block(this, std::vector<Instruction>(it + begin, it + end));
         begin = end;
     }
+    entry = blocks[enter];
 
-    begin = enter + 1;
+    begin = enter;
     for (int end : bounds) {
         Block* b = blocks[begin];
 
         Opcode::Type op = b->instr.back().op;
         b->seq_next = (op != Opcode::BR && op != Opcode::RET) ? blocks[end] : nullptr;
+	if (b->seq_next)
+		b->seq_next->prevs.push_back(b);
 
         int br = b->instr.back().get_branch_target();
         b->br_next = (br > 0) ? blocks[br] : nullptr;
+	if (b->br_next && b->br_next != b->seq_next)
+		b->br_next->prevs.push_back(b);
 
         begin = end;
     }
@@ -382,6 +399,71 @@ Function::~Function()
 {
     for (const auto& iter : blocks)
         delete iter.second;
+}
+
+void Function::build_domtree()
+{
+	typedef std::set<Block*> blockset;
+	std::map<Block*, blockset> dominators;
+	dominators[entry] = blockset();
+	/* uninitialized set denotes complete set */
+	bool change;
+	do {
+		change = false;
+		for (auto pb: blocks) {
+			Block *b = pb.second;
+			if (dominators.find(b) == dominators.end()) {
+				bool found = false;
+				for (Block *p: b->prevs) {
+					auto pps = dominators.find(p);
+					if (pps != dominators.end()) {
+						dominators[b] = pps->second;
+						dominators[b].insert(p);
+						change = true;
+						found = true;
+						break;
+					}
+				}
+				if (!found)
+					continue;
+			}
+			blockset &bs = dominators.find(b)->second;
+			for (auto p: b->prevs) {
+				auto pps = dominators.find(p);
+				if (pps != dominators.end()) {
+					blockset &ps = pps->second;
+					std::list<Block*> erase;
+					for (Block *i: bs) {
+						if (i != p && ps.find(i) == ps.end()) {
+							erase.push_back(i);
+							change = true;
+						}
+					}
+					for (Block *i: erase)
+						bs.erase(i);
+				}
+			}
+		}
+	} while(change);
+	for (auto pb: blocks) {
+		Block *b = pb.second;
+		b->domf = NULL;
+		b->domc.clear();
+	}
+	for (auto pb: blocks) {
+		Block *b = pb.second;
+		blockset &bs = dominators.find(b)->second;
+		for (Block *p: bs) {
+			blockset &ps = dominators.find(p)->second;
+			for (Block *i: ps)
+				bs.erase(i);
+		}
+		assert(bs.size() <= 1);
+		for (Block *p: bs) {
+			b->domf = p;
+			p->domc.push_back(b);
+		}
+	}
 }
 
 Block::Block(Function* func, std::vector<Instruction> instr_)

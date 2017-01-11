@@ -1,0 +1,3 @@
+*.3addr
+*.cfg
+!*.ta.cfg
