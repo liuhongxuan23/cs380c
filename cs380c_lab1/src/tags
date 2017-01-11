@@ -1,0 +1,231 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Universal Ctags Team	//
+!_TAG_PROGRAM_NAME	Universal Ctags	/Derived from Exuberant Ctags/
+!_TAG_PROGRAM_URL	https://ctags.io/	/official site/
+!_TAG_PROGRAM_VERSION	0.0.0	//
+AddToList	csp.c	/^static CSGNode AddToList(CSGNode *root, CSSIdent *id)$/;"	f	typeref:typename:CSGNode	file:
+AssignmentM	csp.c	/^static void AssignmentM(CSGNode *x)$/;"	f	typeref:typename:void	file:
+CSGAddr	csg.h	/^enum {CSGVar, CSGConst, CSGFld, CSGTyp, CSGProc, CSGSProc, CSGAddr, CSGInst};$/;"	e	enum:__anon0f3f46180103
+CSGAdjustLevel	csg.c	/^void CSGAdjustLevel(int n)$/;"	f	typeref:typename:void
+CSGArray	csg.h	/^enum {CSGInteger, CSGBoolean, CSGArray, CSGStruct};$/;"	e	enum:__anon0f3f46180203
+CSGBJump	csg.c	/^void CSGBJump(CSGNode lbl)$/;"	f	typeref:typename:void
+CSGBoolean	csg.h	/^enum {CSGInteger, CSGBoolean, CSGArray, CSGStruct};$/;"	e	enum:__anon0f3f46180203
+CSGCall	csg.c	/^void CSGCall(CSGNode x)$/;"	f	typeref:typename:void
+CSGClose	csg.c	/^void CSGClose(void)$/;"	f	typeref:typename:void
+CSGConst	csg.h	/^enum {CSGVar, CSGConst, CSGFld, CSGTyp, CSGProc, CSGSProc, CSGAddr, CSGInst};$/;"	e	enum:__anon0f3f46180103
+CSGDecode	csg.c	/^void CSGDecode(void)$/;"	f	typeref:typename:void
+CSGEnter	csg.c	/^void CSGEnter(int size)$/;"	f	typeref:typename:void
+CSGEntryPoint	csg.c	/^void CSGEntryPoint(void)$/;"	f	typeref:typename:void
+CSGFJump	csg.c	/^void CSGFJump(CSGNode *lbl)$/;"	f	typeref:typename:void
+CSGField	csg.c	/^void CSGField(CSGNode *x, CSGNode y)  \/* x = x.y *\/$/;"	f	typeref:typename:void
+CSGFixLink	csg.c	/^void CSGFixLink(CSGNode lbl)$/;"	f	typeref:typename:void
+CSGFld	csg.h	/^enum {CSGVar, CSGConst, CSGFld, CSGTyp, CSGProc, CSGSProc, CSGAddr, CSGInst};$/;"	e	enum:__anon0f3f46180103
+CSGIOCall	csg.c	/^void CSGIOCall(CSGNode x, CSGNode y)$/;"	f	typeref:typename:void
+CSGIndex	csg.c	/^void CSGIndex(CSGNode *x, CSGNode y)  \/* x = x[y] *\/$/;"	f	typeref:typename:void
+CSGInit	csg.c	/^void CSGInit(void)$/;"	f	typeref:typename:void
+CSGInitLabel	csg.c	/^void CSGInitLabel(CSGNode *lbl)$/;"	f	typeref:typename:void
+CSGInst	csg.h	/^enum {CSGVar, CSGConst, CSGFld, CSGTyp, CSGProc, CSGSProc, CSGAddr, CSGInst};$/;"	e	enum:__anon0f3f46180103
+CSGInteger	csg.h	/^enum {CSGInteger, CSGBoolean, CSGArray, CSGStruct};$/;"	e	enum:__anon0f3f46180203
+CSGMakeConstNodeDesc	csg.c	/^void CSGMakeConstNodeDesc(CSGNode *x, CSGType typ, long long val)$/;"	f	typeref:typename:void
+CSGMakeNodeDesc	csg.c	/^void CSGMakeNodeDesc(CSGNode *x, CSGNode y)$/;"	f	typeref:typename:void
+CSGNode	csg.h	/^typedef struct CSGNodeDesc *CSGNode;$/;"	t	typeref:struct:CSGNodeDesc *
+CSGNodeDesc	csg.h	/^typedef struct CSGNodeDesc {$/;"	s
+CSGNodeDesc	csg.h	/^} CSGNodeDesc;$/;"	t	typeref:struct:CSGNodeDesc
+CSGOp1	csg.c	/^void CSGOp1(int op, CSGNode *x)  \/* x = op x *\/$/;"	f	typeref:typename:void
+CSGOp2	csg.c	/^void CSGOp2(int op, CSGNode *x, CSGNode y)  \/* x = x op y *\/$/;"	f	typeref:typename:void
+CSGOpen	csg.c	/^void CSGOpen(void)$/;"	f	typeref:typename:void
+CSGParameter	csg.c	/^void CSGParameter(CSGNode *x, CSGType ftyp, signed char class)$/;"	f	typeref:typename:void
+CSGProc	csg.h	/^enum {CSGVar, CSGConst, CSGFld, CSGTyp, CSGProc, CSGSProc, CSGAddr, CSGInst};$/;"	e	enum:__anon0f3f46180103
+CSGRelation	csg.c	/^void CSGRelation(int op, CSGNode *x, CSGNode y)$/;"	f	typeref:typename:void
+CSGReturn	csg.c	/^void CSGReturn(int size)$/;"	f	typeref:typename:void
+CSGSProc	csg.h	/^enum {CSGVar, CSGConst, CSGFld, CSGTyp, CSGProc, CSGSProc, CSGAddr, CSGInst};$/;"	e	enum:__anon0f3f46180103
+CSGSetLabel	csg.c	/^void CSGSetLabel(CSGNode *lbl)$/;"	f	typeref:typename:void
+CSGStart	csg.c	/^void CSGStart(int size)$/;"	f	typeref:typename:void
+CSGStore	csg.c	/^void CSGStore(CSGNode x, CSGNode y)  \/* x = y *\/$/;"	f	typeref:typename:void
+CSGStruct	csg.h	/^enum {CSGInteger, CSGBoolean, CSGArray, CSGStruct};$/;"	e	enum:__anon0f3f46180203
+CSGTestBool	csg.c	/^void CSGTestBool(CSGNode *x)$/;"	f	typeref:typename:void
+CSGTyp	csg.h	/^enum {CSGVar, CSGConst, CSGFld, CSGTyp, CSGProc, CSGSProc, CSGAddr, CSGInst};$/;"	e	enum:__anon0f3f46180103
+CSGType	csg.h	/^typedef struct CSGTypeDesc *CSGType;$/;"	t	typeref:struct:CSGTypeDesc *
+CSGTypeDesc	csg.h	/^typedef struct CSGTypeDesc {$/;"	s
+CSGTypeDesc	csg.h	/^} CSGTypeDesc;$/;"	t	typeref:struct:CSGTypeDesc
+CSGVar	csg.h	/^enum {CSGVar, CSGConst, CSGFld, CSGTyp, CSGProc, CSGSProc, CSGAddr, CSGInst};$/;"	e	enum:__anon0f3f46180103
+CSGboolType	csg.c	/^CSGType CSGlongType, CSGboolType;$/;"	v	typeref:typename:CSGType
+CSGcurlev	csg.c	/^char CSGcurlev;$/;"	v	typeref:typename:char
+CSGlongType	csg.c	/^CSGType CSGlongType, CSGboolType;$/;"	v	typeref:typename:CSGType
+CSGpc	csg.c	/^CSGNode CSGpc;$/;"	v	typeref:typename:CSGNode
+CSSError	css.c	/^void CSSError(char *msg)$/;"	f	typeref:typename:void
+CSSGet	css.c	/^int CSSGet(void)$/;"	f	typeref:typename:int
+CSSIdent	css.c	/^typedef char CSSIdent[CSSidlen];$/;"	t	typeref:typename:char[CSSidlen]	file:
+CSSIdent	css.h	/^typedef char CSSIdent[CSSidlen];$/;"	t	typeref:typename:char[CSSidlen]
+CSSInit	css.c	/^void CSSInit(char *filename)$/;"	f	typeref:typename:void
+CSSbecomes	css.c	/^      CSSrbrace, CSSlparen, CSSlbrak, CSSlbrace, CSSbecomes, CSSnumber,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSbecomes	css.h	/^      CSSrbrace, CSSlparen, CSSlbrak, CSSlbrace, CSSbecomes, CSSnumber,$/;"	e	enum:__anon0f3f79240103
+CSScomma	css.c	/^      CSSleq, CSSgtr, CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak,$/;"	e	enum:__anon0f3f791f0103	file:
+CSScomma	css.h	/^      CSSleq, CSSgtr, CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak,$/;"	e	enum:__anon0f3f79240103
+CSSconst	css.c	/^      CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct, CSSconst,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSconst	css.h	/^      CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct, CSSconst,$/;"	e	enum:__anon0f3f79240103
+CSSdiv	css.c	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSdiv	css.h	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f79240103
+CSSelse	css.c	/^      CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct, CSSconst,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSelse	css.h	/^      CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct, CSSconst,$/;"	e	enum:__anon0f3f79240103
+CSSeof	css.c	/^      CSSvoid, CSSeof};$/;"	e	enum:__anon0f3f791f0103	file:
+CSSeof	css.h	/^      CSSvoid, CSSeof};$/;"	e	enum:__anon0f3f79240103
+CSSeql	css.c	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSeql	css.h	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f79240103
+CSSgeq	css.c	/^      CSSleq, CSSgtr, CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSgeq	css.h	/^      CSSleq, CSSgtr, CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak,$/;"	e	enum:__anon0f3f79240103
+CSSgtr	css.c	/^      CSSleq, CSSgtr, CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSgtr	css.h	/^      CSSleq, CSSgtr, CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak,$/;"	e	enum:__anon0f3f79240103
+CSSid	css.c	/^CSSIdent CSSid;$/;"	v	typeref:typename:CSSIdent
+CSSident	css.c	/^      CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct, CSSconst,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSident	css.h	/^      CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct, CSSconst,$/;"	e	enum:__anon0f3f79240103
+CSSidlen	css.c	/^#define CSSidlen /;"	d	file:
+CSSidlen	css.h	/^#define CSSidlen /;"	d
+CSSif	css.c	/^      CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct, CSSconst,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSif	css.h	/^      CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct, CSSconst,$/;"	e	enum:__anon0f3f79240103
+CSSlbrace	css.c	/^      CSSrbrace, CSSlparen, CSSlbrak, CSSlbrace, CSSbecomes, CSSnumber,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSlbrace	css.h	/^      CSSrbrace, CSSlparen, CSSlbrak, CSSlbrace, CSSbecomes, CSSnumber,$/;"	e	enum:__anon0f3f79240103
+CSSlbrak	css.c	/^      CSSrbrace, CSSlparen, CSSlbrak, CSSlbrace, CSSbecomes, CSSnumber,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSlbrak	css.h	/^      CSSrbrace, CSSlparen, CSSlbrak, CSSlbrace, CSSbecomes, CSSnumber,$/;"	e	enum:__anon0f3f79240103
+CSSleq	css.c	/^      CSSleq, CSSgtr, CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSleq	css.h	/^      CSSleq, CSSgtr, CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak,$/;"	e	enum:__anon0f3f79240103
+CSSlparen	css.c	/^      CSSrbrace, CSSlparen, CSSlbrak, CSSlbrace, CSSbecomes, CSSnumber,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSlparen	css.h	/^      CSSrbrace, CSSlparen, CSSlbrak, CSSlbrace, CSSbecomes, CSSnumber,$/;"	e	enum:__anon0f3f79240103
+CSSlss	css.c	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSlss	css.h	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f79240103
+CSSminus	css.c	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSminus	css.h	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f79240103
+CSSmod	css.c	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSmod	css.h	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f79240103
+CSSneq	css.c	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSneq	css.h	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f79240103
+CSSnumber	css.c	/^      CSSrbrace, CSSlparen, CSSlbrak, CSSlbrace, CSSbecomes, CSSnumber,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSnumber	css.h	/^      CSSrbrace, CSSlparen, CSSlbrak, CSSlbrace, CSSbecomes, CSSnumber,$/;"	e	enum:__anon0f3f79240103
+CSSperiod	css.c	/^      CSSleq, CSSgtr, CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSperiod	css.h	/^      CSSleq, CSSgtr, CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak,$/;"	e	enum:__anon0f3f79240103
+CSSplus	css.c	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSplus	css.h	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f79240103
+CSSrbrace	css.c	/^      CSSrbrace, CSSlparen, CSSlbrak, CSSlbrace, CSSbecomes, CSSnumber,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSrbrace	css.h	/^      CSSrbrace, CSSlparen, CSSlbrak, CSSlbrace, CSSbecomes, CSSnumber,$/;"	e	enum:__anon0f3f79240103
+CSSrbrak	css.c	/^      CSSleq, CSSgtr, CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSrbrak	css.h	/^      CSSleq, CSSgtr, CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak,$/;"	e	enum:__anon0f3f79240103
+CSSrparen	css.c	/^      CSSleq, CSSgtr, CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSrparen	css.h	/^      CSSleq, CSSgtr, CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak,$/;"	e	enum:__anon0f3f79240103
+CSSsemicolon	css.c	/^      CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct, CSSconst,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSsemicolon	css.h	/^      CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct, CSSconst,$/;"	e	enum:__anon0f3f79240103
+CSSstruct	css.c	/^      CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct, CSSconst,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSstruct	css.h	/^      CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct, CSSconst,$/;"	e	enum:__anon0f3f79240103
+CSStimes	css.c	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f791f0103	file:
+CSStimes	css.h	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	e	enum:__anon0f3f79240103
+CSSval	css.c	/^unsigned long long CSSval;$/;"	v	typeref:typename:unsigned long long
+CSSvoid	css.c	/^      CSSvoid, CSSeof};$/;"	e	enum:__anon0f3f791f0103	file:
+CSSvoid	css.h	/^      CSSvoid, CSSeof};$/;"	e	enum:__anon0f3f79240103
+CSSwhile	css.c	/^      CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct, CSSconst,$/;"	e	enum:__anon0f3f791f0103	file:
+CSSwhile	css.h	/^      CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct, CSSconst,$/;"	e	enum:__anon0f3f79240103
+Comment	css.c	/^static void Comment(void)$/;"	f	typeref:typename:void	file:
+CommentLine	css.c	/^static void CommentLine(void)$/;"	f	typeref:typename:void	file:
+Compile	csp.c	/^static void Compile(char *filename)$/;"	f	typeref:typename:void	file:
+ConstExpression	csp.c	/^static void ConstExpression(CSGNode *expr)$/;"	f	typeref:typename:void	file:
+ConstantDeclaration	csp.c	/^static void ConstantDeclaration(CSGNode *root)$/;"	f	typeref:typename:void	file:
+DesignatorM	csp.c	/^static void DesignatorM(CSGNode *x)$/;"	f	typeref:typename:void	file:
+EqualityExpr	csp.c	/^static void EqualityExpr(CSGNode *x)$/;"	f	typeref:typename:void	file:
+ExpList	csp.c	/^static void ExpList(CSGNode proc)$/;"	f	typeref:typename:void	file:
+Expression	csp.c	/^static void Expression(CSGNode *x)$/;"	f	typeref:typename:void	file:
+FP	csg.c	/^static CSGNode code, entrypc, FP, GP;$/;"	v	typeref:typename:CSGNode	file:
+FPSection	csp.c	/^static void FPSection(CSGNode *root, int *paddr)$/;"	f	typeref:typename:void	file:
+Factor	csp.c	/^static void Factor(CSGNode *x)$/;"	f	typeref:typename:void	file:
+FieldList	csp.c	/^static void FieldList(CSGType type)$/;"	f	typeref:typename:void	file:
+FindObj	csp.c	/^static CSGNode FindObj(CSGNode *root, CSSIdent *id)$/;"	f	typeref:typename:CSGNode	file:
+FormalParameters	csp.c	/^static void FormalParameters(CSGNode *root)$/;"	f	typeref:typename:void	file:
+GP	csg.c	/^static CSGNode code, entrypc, FP, GP;$/;"	v	typeref:typename:CSGNode	file:
+IdentArray	csp.c	/^static void IdentArray(CSGNode *root, CSGType type)$/;"	f	typeref:typename:void	file:
+IdentList	csp.c	/^static void IdentList(CSGNode *root, CSGType type)$/;"	f	typeref:typename:void	file:
+Identifier	css.c	/^static void Identifier(void)$/;"	f	typeref:typename:void	file:
+IfStatement	csp.c	/^static void IfStatement(void)$/;"	f	typeref:typename:void	file:
+InitObj	csp.c	/^static void InitObj(CSGNode obj, signed char class, CSGNode dsc, CSGType type, long long val)$/;"	f	typeref:typename:void	file:
+InitProcObj	csp.c	/^static void InitProcObj(CSGNode obj, signed char class, CSGNode dsc, CSGType type, CSGNode entry/;"	f	typeref:typename:void	file:
+InsertObj	csp.c	/^static void InsertObj(CSGNode *root, signed char class, CSGType type, CSSIdent name, long long v/;"	f	typeref:typename:void	file:
+Load	csg.c	/^static void Load(CSGNode *x)$/;"	f	typeref:typename:void	file:
+Number	css.c	/^static void Number(void)$/;"	f	typeref:typename:void	file:
+PrintBrakNode	csg.c	/^static void PrintBrakNode(CSGNode x)$/;"	f	typeref:typename:void	file:
+PrintNode	csg.c	/^static void PrintNode(CSGNode x)$/;"	f	typeref:typename:void	file:
+ProcedureBody	csp.c	/^static void ProcedureBody(CSGNode *proc)$/;"	f	typeref:typename:void	file:
+ProcedureCallM	csp.c	/^static void ProcedureCallM(CSGNode obj, CSGNode *x)$/;"	f	typeref:typename:void	file:
+ProcedureDeclaration	csp.c	/^static void ProcedureDeclaration(void)$/;"	f	typeref:typename:void	file:
+ProcedureHeading	csp.c	/^static void ProcedureHeading(CSGNode *proc)$/;"	f	typeref:typename:void	file:
+Program	csp.c	/^static void Program(void)$/;"	f	typeref:typename:void	file:
+PutOp	csg.c	/^static CSGNode PutOp(int op)$/;"	f	typeref:typename:CSGNode	file:
+PutOpNode	csg.c	/^static CSGNode PutOpNode(int op, CSGNode x)$/;"	f	typeref:typename:CSGNode	file:
+PutOpNodeNode	csg.c	/^static CSGNode PutOpNodeNode(int op, CSGNode x, CSGNode y)$/;"	f	typeref:typename:CSGNode	file:
+RecurseArray	csp.c	/^static void RecurseArray(CSGType *type)$/;"	f	typeref:typename:void	file:
+SimpleExpression	csp.c	/^static void SimpleExpression(CSGNode *x)$/;"	f	typeref:typename:void	file:
+Statement	csp.c	/^static void Statement(void)$/;"	f	typeref:typename:void	file:
+StatementSequence	csp.c	/^static void StatementSequence(void)$/;"	f	typeref:typename:void	file:
+StructType	csp.c	/^static void StructType(CSGType *type)$/;"	f	typeref:typename:void	file:
+Term	csp.c	/^static void Term(CSGNode *x)$/;"	f	typeref:typename:void	file:
+TestInt	csg.c	/^static void TestInt(CSGNode x)$/;"	f	typeref:typename:void	file:
+Type	csp.c	/^static void Type(CSGType *type)$/;"	f	typeref:typename:void	file:
+VariableDeclaration	csp.c	/^static void VariableDeclaration(CSGNode *root)$/;"	f	typeref:typename:void	file:
+WhileStatement	csp.c	/^static void WhileStatement(void)$/;"	f	typeref:typename:void	file:
+_CSubCodeGen_H_	csg.h	/^#define _CSubCodeGen_H_$/;"	d
+_CSubScan_H_	css.h	/^#define _CSubScan_H_$/;"	d
+__anon0f3f46130103	csg.c	/^enum {ineg, iadd, isub, imul, idiv, imod, iparam, ienter, ileave, iend, iload,$/;"	g	file:
+__anon0f3f46180103	csg.h	/^enum {CSGVar, CSGConst, CSGFld, CSGTyp, CSGProc, CSGSProc, CSGAddr, CSGInst};$/;"	g
+__anon0f3f46180203	csg.h	/^enum {CSGInteger, CSGBoolean, CSGArray, CSGStruct};$/;"	g
+__anon0f3f791f0103	css.c	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	g	file:
+__anon0f3f79240103	css.h	/^enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss,$/;"	g
+base	csg.h	/^  CSGType base;  \/\/ base type (array element type)$/;"	m	struct:CSGTypeDesc	typeref:typename:CSGType
+ch	css.c	/^static int ch;$/;"	v	typeref:typename:int	file:
+code	csg.c	/^static CSGNode code, entrypc, FP, GP;$/;"	v	typeref:typename:CSGNode	file:
+dsc	csg.h	/^  CSGNode dsc;  \/\/ Proc: link to procedure scope (head)$/;"	m	struct:CSGNodeDesc	typeref:typename:CSGNode
+entrypc	csg.c	/^static CSGNode code, entrypc, FP, GP;$/;"	v	typeref:typename:CSGNode	file:
+f	css.c	/^static FILE *f;$/;"	v	typeref:typename:FILE *	file:
+fields	csg.h	/^  CSGNode fields;  \/\/ linked list of the fields in a struct$/;"	m	struct:CSGTypeDesc	typeref:typename:CSGNode
+form	csg.h	/^  signed char form;  \/\/ integer, array, struct$/;"	m	struct:CSGTypeDesc	typeref:typename:signed char
+globscope	csp.c	/^static CSGNode globscope;$/;"	v	typeref:typename:CSGNode	file:
+iadd	csg.c	/^enum {ineg, iadd, isub, imul, idiv, imod, iparam, ienter, ileave, iend, iload,$/;"	e	enum:__anon0f3f46130103	file:
+iblbc	csg.c	/^      istore, imove, icmpeq, icmplt, icmple, iblbs, iblbc, icall, ibr, iret,$/;"	e	enum:__anon0f3f46130103	file:
+iblbs	csg.c	/^      istore, imove, icmpeq, icmplt, icmple, iblbs, iblbc, icall, ibr, iret,$/;"	e	enum:__anon0f3f46130103	file:
+ibr	csg.c	/^      istore, imove, icmpeq, icmplt, icmple, iblbs, iblbc, icall, ibr, iret,$/;"	e	enum:__anon0f3f46130103	file:
+icall	csg.c	/^      istore, imove, icmpeq, icmplt, icmple, iblbs, iblbc, icall, ibr, iret,$/;"	e	enum:__anon0f3f46130103	file:
+icmpeq	csg.c	/^      istore, imove, icmpeq, icmplt, icmple, iblbs, iblbc, icall, ibr, iret,$/;"	e	enum:__anon0f3f46130103	file:
+icmple	csg.c	/^      istore, imove, icmpeq, icmplt, icmple, iblbs, iblbc, icall, ibr, iret,$/;"	e	enum:__anon0f3f46130103	file:
+icmplt	csg.c	/^      istore, imove, icmpeq, icmplt, icmple, iblbs, iblbc, icall, ibr, iret,$/;"	e	enum:__anon0f3f46130103	file:
+idiv	csg.c	/^enum {ineg, iadd, isub, imul, idiv, imod, iparam, ienter, ileave, iend, iload,$/;"	e	enum:__anon0f3f46130103	file:
+iend	csg.c	/^enum {ineg, iadd, isub, imul, idiv, imod, iparam, ienter, ileave, iend, iload,$/;"	e	enum:__anon0f3f46130103	file:
+ienter	csg.c	/^enum {ineg, iadd, isub, imul, idiv, imod, iparam, ienter, ileave, iend, iload,$/;"	e	enum:__anon0f3f46130103	file:
+ientrypc	csg.c	/^      iread, iwrite, iwrl, inop, ientrypc};$/;"	e	enum:__anon0f3f46130103	file:
+ileave	csg.c	/^enum {ineg, iadd, isub, imul, idiv, imod, iparam, ienter, ileave, iend, iload,$/;"	e	enum:__anon0f3f46130103	file:
+iload	csg.c	/^enum {ineg, iadd, isub, imul, idiv, imod, iparam, ienter, ileave, iend, iload,$/;"	e	enum:__anon0f3f46130103	file:
+imod	csg.c	/^enum {ineg, iadd, isub, imul, idiv, imod, iparam, ienter, ileave, iend, iload,$/;"	e	enum:__anon0f3f46130103	file:
+imove	csg.c	/^      istore, imove, icmpeq, icmplt, icmple, iblbs, iblbc, icall, ibr, iret,$/;"	e	enum:__anon0f3f46130103	file:
+imul	csg.c	/^enum {ineg, iadd, isub, imul, idiv, imod, iparam, ienter, ileave, iend, iload,$/;"	e	enum:__anon0f3f46130103	file:
+ineg	csg.c	/^enum {ineg, iadd, isub, imul, idiv, imod, iparam, ienter, ileave, iend, iload,$/;"	e	enum:__anon0f3f46130103	file:
+inop	csg.c	/^      iread, iwrite, iwrl, inop, ientrypc};$/;"	e	enum:__anon0f3f46130103	file:
+instruct	csp.c	/^static int instruct;$/;"	v	typeref:typename:int	file:
+iparam	csg.c	/^enum {ineg, iadd, isub, imul, idiv, imod, iparam, ienter, ileave, iend, iload,$/;"	e	enum:__anon0f3f46130103	file:
+iread	csg.c	/^      iread, iwrite, iwrl, inop, ientrypc};$/;"	e	enum:__anon0f3f46130103	file:
+iret	csg.c	/^      istore, imove, icmpeq, icmplt, icmple, iblbs, iblbc, icall, ibr, iret,$/;"	e	enum:__anon0f3f46130103	file:
+istore	csg.c	/^      istore, imove, icmpeq, icmplt, icmple, iblbs, iblbc, icall, ibr, iret,$/;"	e	enum:__anon0f3f46130103	file:
+isub	csg.c	/^enum {ineg, iadd, isub, imul, idiv, imod, iparam, ienter, ileave, iend, iload,$/;"	e	enum:__anon0f3f46130103	file:
+iwrite	csg.c	/^      iread, iwrite, iwrl, inop, ientrypc};$/;"	e	enum:__anon0f3f46130103	file:
+iwrl	csg.c	/^      iread, iwrite, iwrl, inop, ientrypc};$/;"	e	enum:__anon0f3f46130103	file:
+len	csg.h	/^  int len;  \/\/ number of array elements$/;"	m	struct:CSGTypeDesc	typeref:typename:int
+lev	csg.h	/^  signed char lev;  \/\/ 0 = global, 1 = local$/;"	m	struct:CSGNodeDesc	typeref:typename:signed char
+line	csg.h	/^  int line;  \/\/ line number for printing purposes$/;"	m	struct:CSGNodeDesc	typeref:typename:int
+line	css.c	/^static int line;$/;"	v	typeref:typename:int	file:
+main	csp.c	/^int main(int argc, char *argv[])$/;"	f	typeref:typename:int
+name	csg.h	/^  CSSIdent name;  \/\/ name$/;"	m	struct:CSGNodeDesc	typeref:typename:CSSIdent
+next	csg.h	/^  CSGNode next;  \/\/ linked list of all objects in same scope$/;"	m	struct:CSGNodeDesc	typeref:typename:CSGNode
+nxt	csg.h	/^  CSGNode prv, nxt;  \/\/ previous and next instruction$/;"	m	struct:CSGNodeDesc	typeref:typename:CSGNode
+op	csg.h	/^  char op;  \/\/ operation of instruction$/;"	m	struct:CSGNodeDesc	typeref:typename:char
+original	csg.h	/^  CSGNode original;  \/\/ Pointer to original node object if a copy was made$/;"	m	struct:CSGNodeDesc	typeref:typename:CSGNode
+prv	csg.h	/^  CSGNode prv, nxt;  \/\/ previous and next instruction$/;"	m	struct:CSGNodeDesc	typeref:typename:CSGNode
+size	csg.h	/^  int size;  \/\/ total size of the type$/;"	m	struct:CSGTypeDesc	typeref:typename:int
+sym	csp.c	/^static int sym;$/;"	v	typeref:typename:int	file:
+tos	csp.c	/^static int tos;$/;"	v	typeref:typename:int	file:
+type	csg.h	/^  CSGType type;  \/\/ type$/;"	m	struct:CSGNodeDesc	typeref:typename:CSGType
+val	csg.h	/^  long long val;  \/\/ Const: value; Var: address; Fld: offset; SProc: number; Type: size$/;"	m	struct:CSGNodeDesc	typeref:typename:long long
+x	csg.h	/^  CSGNode x, y;  \/\/ the two operands$/;"	m	struct:CSGNodeDesc	typeref:typename:CSGNode
+y	csg.h	/^  CSGNode x, y;  \/\/ the two operands$/;"	m	struct:CSGNodeDesc	typeref:typename:CSGNode
