@@ -259,6 +259,17 @@ void Instruction::ccode (FILE *out)
 	}
 }
 
+int Instruction::get_branch_target () const
+{
+	if (op.type == Opcode::BR)
+		return oper1.value;
+	if (op.type == Opcode::BLBC || op.type == Opcode::BLBS)
+		return oper2.value;
+	if (op.type == Opcode::RET)
+		return 0;
+	return -1;
+}
+
 Program::Program (FILE *in):
 	Program()
 {

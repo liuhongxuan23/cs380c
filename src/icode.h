@@ -54,11 +54,12 @@ struct Instruction {
 	void icode (FILE *out);
 	void ccode (FILE *out);
 	operator bool() { return bool(op); }
+        int get_branch_target () const;
 };
 
 struct Program {
 	std::vector<Instruction> instr;
-	Program () {}
+        Program () { instr.push_back(Instruction()); }
 	Program (FILE *in);
 	void icode (FILE *out);
 	void ccode (FILE *out);
