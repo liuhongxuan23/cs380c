@@ -2,4 +2,4 @@
 
 # Script to compile your source
 cd "$(dirname $0)"/../../src
-make -B all
+make -B lab1

@@ -3,6 +3,6 @@
 
 int main() {
 	Program prog(stdin);
-	prog.icode(stdout);
+	prog.ccode(stdout);
 	return 0;
 }

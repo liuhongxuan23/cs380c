@@ -3,6 +3,6 @@ CXXFLAGS=-std=gnu++11 -g
 
 .PHONY: all
 
-main: icode.o main.o
+lab1: icode.o lab1.o
 
-all: main
+all: lab1

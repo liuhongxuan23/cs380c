@@ -1,0 +1,6 @@
+*.3addr
+*.3addr.bin
+*.3addr.c
+*.3addr.txt
+*.gcc.bin
+*.gcc.txt

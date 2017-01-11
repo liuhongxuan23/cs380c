@@ -41,6 +41,7 @@ struct Operand {
 	Operand (const char *str);
 	operator bool() { return type != UNKNOWN; }
 	void icode (FILE *out);
+	void ccode (FILE *out);
 };
 
 struct Instruction {
@@ -51,6 +52,7 @@ struct Instruction {
 	Instruction (): addr(-1) {}
 	Instruction (FILE *in);
 	void icode (FILE *out);
+	void ccode (FILE *out);
 	operator bool() { return bool(op); }
 };
 
@@ -59,4 +61,5 @@ struct Program {
 	Program () {}
 	Program (FILE *in);
 	void icode (FILE *out);
+	void ccode (FILE *out);
 };;

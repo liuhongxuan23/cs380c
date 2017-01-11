@@ -35,7 +35,7 @@ const char *const Opcode::opname[OPCODE_MAX] = {
 
 const int Opcode::operand_count[OPCODE_MAX] = {
 	[UNKNOWN]=-1,
-	[ADD]=2, [SUB]=2, [MUL]=2, [DIV]=2, [MOD]=2, [NEG]=2,
+	[ADD]=2, [SUB]=2, [MUL]=2, [DIV]=2, [MOD]=2, [NEG]=1,
 	[CMPEQ]=2, [CMPLE]=2, [CMPLT]=2,
 	[NOP]=0,
 	[BR]=1, [BLBC]=2, [BLBS]=2,
@@ -118,6 +118,23 @@ void Operand::icode (FILE *out)
 	}
 }
 
+void Operand::ccode (FILE *out)
+{
+	if (type == REG) {
+		fprintf(out, "r[%lld]", value);
+	} else if (type == LABEL) {
+		fprintf(out, "instr_%lld", value);
+	} else if (type == GP) {
+		fprintf(out, "GP");
+	} else if (type == FP) {
+		fprintf(out, "FP");
+	} else if (type == LOCAL) {
+		fprintf(out, "LOCAL(%lld)", value);
+	} else if (type == CONST) {
+		fprintf(out, "%lld", value);
+	}
+}
+
 Instruction::Instruction (FILE *in):
 	Instruction()
 {
@@ -153,6 +170,95 @@ void Instruction::icode (FILE *out)
 	fprintf(out, "\n");
 }
 
+void Instruction::ccode (FILE *out)
+{
+	if (op == Opcode::ENTER) {
+		fprintf(out, "void instr_%lld() {\n", addr);
+	} else if (op == Opcode::ENTRYPC) {
+		fprintf(out, "void instr_%lld();\nvoid (*entry)() = instr_%lld", addr + 1, addr + 1);
+	} else if (op == Opcode::NOP) {
+		/* Nothing */
+	} else {
+		fprintf(out, "instr_%lld: ", addr);
+	}
+
+	switch(op) {
+	case Opcode::ADD:
+		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " + "); oper2.ccode(out);
+		break;
+	case Opcode::SUB:
+		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " - "); oper2.ccode(out);
+		break;
+	case Opcode::MUL:
+		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " * "); oper2.ccode(out);
+		break;
+	case Opcode::DIV:
+		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " / "); oper2.ccode(out);
+		break;
+	case Opcode::MOD:
+		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " %% "); oper2.ccode(out);
+		break;
+	case Opcode::NEG:
+		fprintf(out, "r[%lld] = ", addr); fprintf(out, "- "); oper1.ccode(out);
+		break;
+	case Opcode::CMPEQ:
+		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " == "); oper2.ccode(out);
+		break;
+	case Opcode::CMPLE:
+		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " <= "); oper2.ccode(out);
+		break;
+	case Opcode::CMPLT:
+		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " < "); oper2.ccode(out);
+		break;
+	case Opcode::BR:
+		fprintf(out, "goto "); oper1.ccode(out);
+		break;
+	case Opcode::BLBC:
+		fprintf(out, "if ("); oper1.ccode(out); fprintf(out, "== 0) goto "); oper2.ccode(out);
+		break;
+	case Opcode::BLBS:
+		fprintf(out, "if ("); oper1.ccode(out); fprintf(out, "!= 0) goto "); oper2.ccode(out);
+		break;
+	case Opcode::CALL:
+		fprintf(out, "SP -= 8; MEM(SP) = %lld + 1; ", addr); oper1.ccode(out); fprintf(out, "()");
+		break;
+	case Opcode::LOAD:
+		fprintf(out, "r[%lld] = MEM(", addr); oper1.ccode(out); fprintf(out, ")");
+		break;
+	case Opcode::STORE:
+		fprintf(out, "MEM("); oper2.ccode(out); fprintf(out, ") = "); oper1.ccode(out);
+		break;
+	case Opcode::MOVE:
+		fprintf(out, "r[%lld] = ", addr); oper2.ccode(out); fprintf(out, " = "); oper1.ccode(out);
+		break;
+	case Opcode::READ:
+		fprintf(out, "ReadLong(r[%lld])", addr);
+		break;
+	case Opcode::WRITE:
+		fprintf(out, "WriteLong("); oper1.ccode(out); fprintf(out, ")");
+		break;
+	case Opcode::WRL:
+		fprintf(out, "WriteLine()");
+		break;
+	case Opcode::PARAM:
+		fprintf(out, "SP -= 8; MEM(SP) = "); oper1.ccode(out);
+		break;
+	case Opcode::ENTER:
+		fprintf(out, "SP -= 8; MEM(SP) = FP; FP = SP; SP -= "); oper1.ccode(out);
+		break;
+	case Opcode::RET:
+		fprintf(out, "SP = FP + 16 + "); oper1.ccode(out); fprintf(out, "; FP = MEM(FP)");
+		break;
+	}
+
+	if (op != Opcode::NOP) {
+		fprintf(out, ";\n");
+	}
+	if (op == Opcode::RET) {
+		fprintf(out, "}\n");
+	}
+}
+
 Program::Program (FILE *in):
 	Program()
 {
@@ -167,4 +273,31 @@ void Program::icode (FILE *out)
 {
 	for (auto p = instr.begin(); p != instr.end(); ++p)
 		p->icode(out);
+}
+
+void Program::ccode (FILE *out)
+{
+
+	fprintf(out, "%s",
+	"#include <stdio.h>\n"
+	"#define WriteLine() printf(\"\\n\");\n"
+	"#define WriteLong(x) printf(\" %lld\", (long)x);\n"
+	"#define ReadLong(a) if (fscanf(stdin, \"%lld\", &a) != 1) a = 0;\n"
+	"#define long long long\n"
+	"#define MEM(a) *(long *)(memory + a)\n"
+	"#define LOCAL(a) *(long *)(memory + FP + a)\n"
+	"\n"
+	"char memory[65536];\n"
+	"long r[65536];\n"
+	"long GP = 0;\n"
+	"long SP = 65536;\n"
+	"long FP = 65536;\n"
+	"\n"
+	);
+
+
+	for (auto p = instr.begin(); p != instr.end(); ++p)
+		p->ccode(out);
+
+	fprintf(out,"void main()\n{\n\t(*entry)();\n}\n");
 }
