@@ -471,7 +471,6 @@ void Program::rename()
 
 void Program::icode (FILE *out)
 {
-	rename();
 	ssa_mode = false;
 	fprintf(out, "instr 1: nop\n");
 	int i;
@@ -489,7 +488,6 @@ void Program::icode (FILE *out)
 
 void Program::ccode (FILE *out)
 {
-	rename();
 	fprintf(out, "%s",
 	"#include <stdio.h>\n"
 	"#define WriteLine() printf(\"\\n\");\n"
