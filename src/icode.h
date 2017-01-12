@@ -7,6 +7,8 @@
 #include <unordered_set>
 #include <unordered_map>
 
+extern bool output_report;
+
 struct Opcode {
 	enum Type {
 		UNKNOWN = 0,
