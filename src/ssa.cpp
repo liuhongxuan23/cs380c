@@ -8,6 +8,8 @@ using std::vector;
 using std::map;
 using std::unordered_set;
 using std::unordered_map;
+using std::pair;
+using std::make_pair;
 
 static inline bool is_ancestor(Block* x, Block* y)
 {
@@ -37,21 +39,25 @@ void Block::compute_df()
 
 void Block::find_defs()
 {
-    for (Instruction& in : instr)
-        if (in.op == Opcode::MOVE && !in.oper[1].tag.empty())
-            defs.insert(in.oper[1].tag);
+    for (Instruction& in : instr) {
+        const auto& oper = in.oper[1];
+        if (in.op == Opcode::MOVE && oper.is_local()) {
+            defs.insert(oper.value);
+            func->offset2tag[oper.value] = oper.tag;
+        }
+    }
 }
 
 void Function::place_phi()
 {
-    unordered_map<string, vector<Block*>> def_sites;
+    unordered_map<int, vector<Block*>> def_sites;
 
     for (const auto& addr_block : blocks)
-        for (const string& var : addr_block.second->defs)
+        for (int var : addr_block.second->defs)
             def_sites[var].push_back(addr_block.second);
 
     for (auto& var_blocks : def_sites) {
-        string var = var_blocks.first;
+        int var = var_blocks.first;
         auto& blocks = var_blocks.second;
 
         while (!blocks.empty()) {
@@ -68,30 +74,60 @@ void Function::place_phi()
     }
 }
 
-static void rename_phi(Block* child, Block* parent, map<string, RenameStack>& stack)
+bool Operand::operator< (const Operand& o) const
+{
+    if (type < o.type) return true;
+    if (type > o.type) return false;
+    if (value < o.value) return true;
+    if (value > o.value) return false;
+    return ssa_idx < o.ssa_idx;
+}
+
+static Operand ssa_oper(int var, int idx)
+{
+    Operand r;
+    r.type = Operand::LOCAL;
+    r.value = var;
+    r.ssa_idx = idx;
+    return r;
+}
+
+static Operand reg_oper(const Instruction& in)
+{
+    Operand r;
+    r.type = Operand::REG;
+    r.value = in.addr;
+    r.ssa_idx = -1;
+    return r;
+}
+
+static void rename_phi(Block* child, Block* parent, map<int, RenameStack>& stack)
 {
     if (child == nullptr) return;
 
     auto it = std::find(child->prevs.cbegin(), child->prevs.cend(), parent);
     int p = it - child->prevs.cbegin();
 
-    for (auto& var_phi : child->phi)
-        var_phi.second.r[p] = stack[var_phi.first].top();
+    for (auto& var_phi : child->phi) {
+        int var = var_phi.first;
+        Phi& phi = var_phi.second;
+        phi.r[p] = ssa_oper(var, stack[var].top());
+    }
 }
 
-void Block::ssa_rename_var(map<string, RenameStack>& stack)
+void Block::ssa_rename_var(map<int, RenameStack>& stack)
 {
     for (auto& var_phi : phi)
         var_phi.second.l = stack[var_phi.first].push();
 
     for (auto& in : instr) {
-        if (!in.oper[0].tag.empty())
-            in.oper[0].ssa_idx = stack[in.oper[0].tag].top();
-        if (!in.oper[1].tag.empty())
-            in.oper[1].ssa_idx = stack[in.oper[1].tag].top();
+        if (in.oper[0].is_local())
+            in.oper[0].ssa_idx = stack[in.oper[0].value].top();
+        if (in.oper[1].is_local())
+            in.oper[1].ssa_idx = stack[in.oper[1].value].top();
 
-        if (in.op == Opcode::MOVE && !in.oper[1].tag.empty())
-            in.oper[1].ssa_idx = stack[in.oper[1].tag].push();
+        if (in.op == Opcode::MOVE && in.oper[1].is_local())
+            in.oper[1].ssa_idx = stack[in.oper[1].value].push();
     }
 
     rename_phi(seq_next, this, stack);
@@ -100,8 +136,79 @@ void Block::ssa_rename_var(map<string, RenameStack>& stack)
     for (Block* c : domc)
         c->ssa_rename_var(stack);
 
-    for (const string& var : defs)
+    for (int var : defs)
         stack[var].pop();
+}
+
+static inline string var_name(const string& var, int idx)
+{ 
+    return var + std::to_string(idx);
+}
+
+static inline string var_name(const Operand& oper)
+{
+    if (oper.tag.empty() || oper.ssa_idx == -1) return string();
+    return var_name(oper.tag, oper.ssa_idx);
+}
+
+static inline pair<string, int> operand(const Operand& oper)
+{
+    return make_pair(oper.tag, oper.ssa_idx);
+}
+
+void Function::ssa_constant_propagate()
+{
+    map<Operand, long long> const_val;
+
+    bool updated = true;
+    while (updated) {
+        updated = false;
+
+        for (auto& addr_block : blocks) {
+            Block* b = addr_block.second;
+
+            for (auto& var_phi : b->phi) {
+                int var = var_phi.first;
+                Phi& phi = var_phi.second;
+                assert(!phi.r.empty());
+
+                bool is_const = true;
+                for (Operand& oper : phi.r)
+                    if (!oper.is_const()) {
+                        if (const_val.count(oper) > 0)
+                            oper.to_const(const_val[oper]);
+                        else
+                            is_const = false;
+                    }
+                if (!is_const) continue;
+
+                for (int i = 1; i < phi.r.size(); ++i)
+                    if (phi.r[i].value != phi.r[0].value)
+                        is_const = false;
+                if (!is_const) continue;
+
+                const_val[ssa_oper(var, phi.l)] = phi.r[0].value;
+                phi.r.clear();
+                updated = true;
+            }
+
+            for (Instruction& in : b->instr)
+                if (in.op != Opcode::NOP) {
+                    for (int i = 0; i < 2; ++i)
+                        if (in.isrightvalue(i) && const_val.count(in.oper[i]) > 0)
+                                in.oper[i].to_const(const_val[in.oper[i]]);
+
+                    if (in.isconst()) {
+                        long long val = in.constvalue();
+                        const_val[reg_oper(in)] = val;
+                        if (in.op == Opcode::MOVE)
+                            const_val[in.oper[1]] = val;
+                        in.erase();
+                        updated = true;
+                    }
+                }
+        }
+    }
 }
 
 void Program::ssa_icode(FILE* out)
@@ -125,23 +232,33 @@ void Program::ssa_icode(FILE* out)
             long long addr = block->ssa_addr;
 
             for (auto& var_phi : block->phi) {
-                const string& var = var_phi.first;
+                int var = var_phi.first;
                 auto& phi = var_phi.second;
+                if (phi.r.empty()) continue;
+                string tag = func->offset2tag[var];
 
                 fprintf(out, "instr %lld: phi", addr);
-                for (int idx : phi.r)
-                    fprintf(out, " %s$%d", var.c_str(), idx);
+                for (const Operand& oper : phi.r) {
+                    if (oper.type == Operand::LOCAL) {
+                        fprintf(out, " %s$%d", tag.c_str(), oper.ssa_idx);
+                    } else {
+                        assert(oper.type == Operand::CONST);
+                        fprintf(out, " %lld", oper.value);
+                    }
+                }
                 fputc('\n', out);
 
-                fprintf(out, "instr %lld: move (%lld) %s$%d\n", addr + 1, addr, var.c_str(), phi.l);
+                fprintf(out, "instr %lld: move (%lld) %s$%d\n", addr + 1, addr, tag.c_str(), phi.l);
 
                 addr += 2;
             }
 
             for (int i = 0; i < block->instr.size() - 1; ++i)
-                block->instr[i].icode(out);
+                if (block->instr[i].op != Opcode::NOP)
+                    block->instr[i].icode(out);
 
             Instruction& in = block->instr.back();
+            if (in.op == Opcode::NOP) continue;
             if (in.op == Opcode::BR)
                 fprintf(out, "instr %lld: br [%lld]\n", in.addr, block->br_next->ssa_addr);
             else if (in.op == Opcode::BLBC)
@@ -178,7 +295,13 @@ void Program::place_phi()
 void Program::ssa_rename_var()
 {
     for (Function* func : funcs) {
-        map<string, RenameStack> stack;
+        map<int, RenameStack> stack;
         func->entry->ssa_rename_var(stack);
     }
+}
+
+void Program::ssa_constant_propagate()
+{
+    for (Function* func : funcs)
+        func->ssa_constant_propagate();
 }

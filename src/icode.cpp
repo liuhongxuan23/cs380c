@@ -368,6 +368,13 @@ bool Instruction::isrightvalue(int o) const
 	return false;
 }
 
+void Instruction::erase()
+{
+    op.type = Opcode::NOP;
+    oper[0].type = Operand::UNKNOWN;
+    oper[1].type = Operand::UNKNOWN;
+}
+
 Program::Program (FILE *in):
 	Program()
 {
@@ -533,6 +540,14 @@ void Program::constant_propagate()
 			}
 		} while(change);
 	}
+}
+
+void Operand::to_const(long long val)
+{
+    type = Operand::CONST;
+    value = val;
+    tag.clear();
+    ssa_idx = -1;
 }
 
 Program::~Program()

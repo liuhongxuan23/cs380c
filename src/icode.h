@@ -50,6 +50,12 @@ struct Operand {
 
         // SSA
         int ssa_idx = -1;
+
+        bool is_local() const { return type == LOCAL; }
+        bool is_const() const { return type == CONST; }
+        void to_const(long long val);
+
+        bool operator< (const Operand& o) const;
 };
 
 struct Instruction {
@@ -66,6 +72,8 @@ struct Instruction {
 	bool isconst() const;
 	long long constvalue() const;
 	bool isrightvalue(int o) const;
+
+        void erase();
 };
 
 class Function;
@@ -73,7 +81,7 @@ class Program;
 
 struct Phi {
     int l;
-    std::vector<int> r;
+    std::vector<Operand> r;
 };
 
 struct RenameStack {
@@ -102,13 +110,13 @@ public:
 
     // SSA
     std::vector<Block*> df;
-    std::unordered_set<std::string> defs;
-    std::unordered_map<std::string, Phi> phi;
+    std::unordered_set<int> defs;
+    std::unordered_map<int, Phi> phi;
     long long ssa_addr = 0;
 
     void compute_df();
     void find_defs();
-    void ssa_rename_var(std::map<std::string, RenameStack>& stack);
+    void ssa_rename_var(std::map<int, RenameStack>& stack);
 };
 
 class Function {
@@ -125,7 +133,9 @@ public:
     void build_domtree();
 
     // SSA
+    std::unordered_map<int, std::string> offset2tag;
     void place_phi();
+    void ssa_constant_propagate();
 };
 
 struct Program {
@@ -145,6 +155,7 @@ struct Program {
         void find_defs();
         void place_phi();
         void ssa_rename_var();
+        void ssa_constant_propagate();
 
         void ssa_icode(FILE* out);
 };
