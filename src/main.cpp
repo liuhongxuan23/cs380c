@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
 		char *dot;
 		do {
 			dot = strchr(opt, ',');
-			*dot = '\0';
+			if (dot) *dot = '\0';
 			int i;
 			for (i = 0; i < MAX_OPT; ++i) {
 				if (strcmp(s, optname[i]) == 0) {
