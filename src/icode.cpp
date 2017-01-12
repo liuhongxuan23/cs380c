@@ -650,10 +650,10 @@ int Function::rename(int i)
 {
 	for (Block *p = entry; p != NULL; p = p->order_next) {
 		assert(!p->instr.empty());
-		for (Instruction *ins: p->instr) {
+		p->name = i;
+		for (Instruction *ins: p->instr) if (ins->op != Opcode::NOP) {
 			ins->name = i++;
 		}
-		p->name = p->instr.front()->name;
 	}
 	// Function name not change
 	//name = entry->name;
@@ -666,7 +666,7 @@ void Function::ccode(FILE *out) const
 
 	for (Block *p = entry; p != NULL; p = p->order_next) {
 		assert(!p->instr.empty());
-		for (Instruction *ins: p->instr)
+		for (Instruction *ins: p->instr) if (ins->op != Opcode::NOP)
 			ins->ccode(out);
 	}
 
@@ -678,7 +678,7 @@ int Function::icode(FILE *out) const
 	int i;
 	for (Block *p = entry; p != NULL; p = p->order_next) {
 		assert(!p->instr.empty());
-		for (Instruction *ins: p->instr)
+		for (Instruction *ins: p->instr) if (ins->op != Opcode::NOP)
 			ins->icode(out);
 		i = p->instr.back()->name;
 	}
