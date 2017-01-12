@@ -4,6 +4,7 @@
 #include <list>
 #include <stack>
 #include <map>
+#include <set>
 #include <unordered_set>
 #include <unordered_map>
 
@@ -126,6 +127,7 @@ public:
     int arg_count;
     bool is_main;
     std::map<int, Block*> blocks;
+    std::map<Block*, std::set<Block*> > loops;
     Block* entry;
 
     void build_domtree();

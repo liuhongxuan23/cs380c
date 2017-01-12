@@ -574,6 +574,36 @@ void Function::build_domtree()
 			}
 		}
 	} while(change);
+	std::multimap<Block*, Block*> backedge;
+	for (auto pb: blocks) {
+		Block *b = pb.second;
+		blockset &bs = dominators.find(b)->second;
+		if (b->seq_next != NULL && bs.find(b->seq_next) != bs.end())
+			backedge.insert(std::make_pair(b->seq_next, b));
+		if (b->br_next != NULL && bs.find(b->br_next) != bs.end())
+			backedge.insert(std::make_pair(b->br_next, b));
+	}
+	for (auto pb: blocks) {
+		Block *b = pb.second;
+		auto st = backedge.lower_bound(b), ed = backedge.upper_bound(b);
+		if (st != ed) {
+			loops[b] = blockset();
+			blockset candid, &loop = loops[b];
+			loop.insert(b);
+			for (auto i = st; i != ed; ++i) {
+				candid.insert(i->second);
+				loop.insert(i->second);
+			}
+			while (!candid.empty()) {
+				Block *s = *candid.begin();
+				candid.erase(candid.begin());
+				for (Block *t: s->prevs) if (loop.find(t) == loop.end()) {
+					candid.insert(t);
+					loop.insert(t);
+				}
+			}
+		}
+	}
 	for (auto pb: blocks) {
 		Block *b = pb.second;
 		b->idom = NULL;

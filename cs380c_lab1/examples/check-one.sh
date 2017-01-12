@@ -2,7 +2,7 @@
 
 C_SUBSET_COMPILER=../src/csc
 #TODO: set THREE_ADDR_TO_C_TRANSLATOR to your own converter
-THREE_ADDR_TO_C_TRANSLATOR=../lab1/run.sh
+THREE_ADDR_TO_C_TRANSLATOR="../lab1/run.sh -opt=scp,dsl"
 
 [ $# -ne 1 ] && { echo "Usage $0 PROGRAM" >&2; exit 1; }
 

@@ -6,13 +6,13 @@
 
 enum Opt {
 	SCP, //simple constant propagation
-	DSL, //dead statement elimination
+	DSE, //dead statement elimination
 	MAX_OPT,
 };
 
 const char *optname[] = {
 	[SCP] = "scp",
-	[DSL] = "dsl",
+	[DSE] = "dse",
 };
 
 enum Backend {
@@ -20,6 +20,7 @@ enum Backend {
 	C,
 	CFG,
 	REP,
+	DOM,
 	MAX_BACKEND,
 };
 
@@ -28,10 +29,11 @@ const char *backendname[] = {
 	[C] = "c",
 	[CFG] = "cfg",
 	[REP] = "rep",
+	[DOM] = "dom",
 };
 
 void print_cfg(Program *prog) {
-	for (auto func : prog->funcs) {
+	for (auto func: prog->funcs) {
 		printf("Function: %lld\n", func->blocks.cbegin()->second->instr[0].addr);
 
 		printf("Basic blocks:");
@@ -51,6 +53,45 @@ void print_cfg(Program *prog) {
 	}
 }
 
+void print_dom(Program *prog) {
+	for (auto func: prog->funcs) {
+		printf("Function: %lld\n", func->blocks.cbegin()->second->instr[0].addr);
+
+		printf("Basic blocks:");
+		for (auto iter : func->blocks)
+			printf(" %lld", iter.second->instr[0].addr);
+
+		printf("\nCFG:\n");
+		for (auto iter : func->blocks) {
+			Block* b = iter.second;
+			printf("%lld ->", b->instr[0].addr);
+			if (b->seq_next != nullptr)
+				printf(" %lld", b->seq_next->instr[0].addr);
+			if (b->br_next != nullptr)
+				printf(" %lld", b->br_next->instr[0].addr);
+			putchar('\n');
+		}
+
+		printf("\nDom Tree:\n");
+		for (auto iter : func->blocks) {
+			Block* b = iter.second;
+			printf("%lld ->", b->instr[0].addr);
+			for (Block *c: b->domc)
+				printf(" %lld", c->instr[0].addr);
+			putchar('\n');
+		}
+
+		printf("\nLoops:\n");
+		for (auto iter : func->loops) {
+			Block *b = iter.first;
+			printf("%lld ->", b->instr[0].addr);
+			for (Block *c: iter.second) {
+				printf(" %lld", c->instr[0].addr);
+			}
+			putchar('\n');
+		}
+	}
+}
 int main(int argc, char **argv) {
 	std::vector<Opt> opts;
 	Backend b;
@@ -118,12 +159,13 @@ int main(int argc, char **argv) {
 
 	Program prog(stdin);
 	prog.find_functions();
+	prog.build_domtree();
 
 	for (Opt o: opts) switch(o) {
 	case SCP:
 		prog.constant_propagate();
 		break;
-	case DSL:
+	case DSE:
 		prog.dead_eliminate();
 		break;
 	}
@@ -136,6 +178,9 @@ int main(int argc, char **argv) {
 		break;
 	case CFG:
 		print_cfg(&prog);
+		break;
+	case DOM:
+		print_dom(&prog);
 		break;
 	}
 
