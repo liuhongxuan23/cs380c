@@ -66,6 +66,7 @@ struct Instruction {
 	bool isconst() const;
 	long long constvalue() const;
 	bool isrightvalue(int o) const;
+	bool eliminable() const;
 };
 
 class Function;
@@ -127,6 +128,7 @@ public:
 
     void build_domtree();
     void constant_propagate();
+    void dead_eliminate();
 
     // SSA
     void place_phi();
@@ -143,6 +145,7 @@ struct Program {
         void find_functions();
 	void build_domtree();
 	void constant_propagate();
+	void dead_eliminate();
 
         // SSA
         void compute_df();

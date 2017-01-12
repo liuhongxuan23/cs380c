@@ -181,8 +181,6 @@ void Instruction::ccode (FILE *out) const
 		fprintf(out, "void instr_%lld() {\n", addr);
 	} else if (op == Opcode::ENTRYPC) {
 		fprintf(out, "void instr_%lld();\nvoid (*entry)() = instr_%lld", addr + 1, addr + 1);
-	} else if (op == Opcode::NOP) {
-		/* Nothing */
 	} else {
 		fprintf(out, "instr_%lld: ", addr);
 	}
@@ -256,9 +254,7 @@ void Instruction::ccode (FILE *out) const
 		break;
 	}
 
-	if (op != Opcode::NOP) {
-		fprintf(out, ";\n");
-	}
+	fprintf(out, ";\n");
 	if (op == Opcode::RET) {
 		fprintf(out, "}\n");
 	}
@@ -344,6 +340,7 @@ bool Instruction::isrightvalue(int o) const
 		case Opcode::CMPLT:
 		case Opcode::BLBC:
 		case Opcode::BLBS:
+		case Opcode::LOAD:
 		case Opcode::STORE:
 		case Opcode::MOVE:
 		case Opcode::WRITE:
@@ -361,9 +358,29 @@ bool Instruction::isrightvalue(int o) const
 		case Opcode::CMPEQ:
 		case Opcode::CMPLE:
 		case Opcode::CMPLT:
+		case Opcode::STORE:
 			return true;
 		}
 		return false;
+	}
+	return false;
+}
+
+bool Instruction::eliminable() const
+{
+	switch (op) {
+	case Opcode::ADD:
+	case Opcode::SUB:
+	case Opcode::MUL:
+	case Opcode::DIV:
+	case Opcode::MOD:
+	case Opcode::NEG:
+	case Opcode::CMPEQ:
+	case Opcode::CMPLE:
+	case Opcode::CMPLT:
+	case Opcode::LOAD:
+	case Opcode::MOVE:
+		return true;
 	}
 	return false;
 }
@@ -405,8 +422,17 @@ void Program::ccode (FILE *out) const
 	);
 
 
-	for (auto p = ++instr.begin(); p != instr.end(); ++p)
-		p->ccode(out);
+	bool in_function = false;
+	for (auto p = ++instr.begin(); p != instr.end(); ++p) {
+		if (p->op == Opcode::ENTER) {
+			in_function = true;
+		} else if (p->op == Opcode::RET) {
+			in_function = false;
+		}
+		if (in_function || p->op != Opcode::NOP) {
+			p->ccode(out);
+		}
+	}
 
 	fprintf(out,"void main()\n{\n\t(*entry)();\n}\n");
 }
@@ -438,6 +464,12 @@ void Program::constant_propagate()
 {
 	for (Function *f: funcs)
 		f->constant_propagate();
+}
+
+void Program::dead_eliminate()
+{
+	for (Function *f: funcs)
+		f->dead_eliminate();
 }
 
 Program::~Program()
@@ -666,6 +698,105 @@ void Function::constant_propagate()
 	} while(change);
 	fprintf(stderr, "Function: %d\n", enter);
 	fprintf(stderr, "Number of constants propagated: %d\n", propa_count);
+}
+
+void Function::dead_eliminate()
+{
+	typedef std::set<int> iset; // Set of variable definitions
+	int elimin_count = 0;
+	std::vector<Instruction> &instr = prog->instr;
+	std::map<Block*, iset> lv; // Live Variables OUT
+	std::set<int> lvreg; // Live Temporary Registers
+	for (auto pb: blocks) {
+		Block *b = pb.second;
+		lv[b] = iset();
+	}
+	bool change;
+	do {
+		change = false;
+		for (auto ib = blocks.rbegin(); ib != blocks.rend(); ++ib) {
+			Block *b = ib->second;
+			iset cur = lv[b]; // Copy
+			for (int j = (int)b->instr.size() - 1; j >= 0; --j) {
+				int i = b->instr[j].addr; // Instruction address;
+				Instruction &ins = instr[i]; // Instruction in Program
+				bool live = false;
+				if (!ins.eliminable() || lvreg.find(i) != lvreg.end()) {
+					live = true;
+				}
+				if (ins.op == Opcode::MOVE && ins.oper[1] == Operand::LOCAL) {
+					int def = ins.oper[1].value;
+					if (cur.find(def) != cur.end()) {
+						cur.erase(def);
+						live = true;
+					}
+				}
+				if (live) for (int o = 0; o < 2; ++o) if (ins.isrightvalue(o)) {
+					switch(ins.oper[o]) {
+					case Operand::LOCAL: {
+						int use = ins.oper[o].value;
+						cur.insert(use);
+						break;
+					}
+					case Operand::REG: {
+						int reg = ins.oper[o].value;
+						if (lvreg.find(reg) == lvreg.end()) {
+							lvreg.insert(reg);
+							change = true;
+						}
+						break;
+					}
+					}
+				}
+			}
+			for (Block *b2: b->prevs) {
+				iset &out2 = lv[b2];
+				for (auto i: cur) if (out2.find(i) == out2.end()) {
+					change = true;
+					out2.insert(i);
+				}
+			}
+		}
+	} while (change);
+	for (auto ib = blocks.rbegin(); ib != blocks.rend(); ++ib) {
+		Block *b = ib->second;
+		iset cur = lv[b]; // Copy
+		for (int j = (int)b->instr.size() - 1; j >= 0; --j) {
+			int i = b->instr[j].addr; // Instruction address;
+			Instruction &ins = instr[i]; // Instruction in Program
+			bool live = false;
+			if (!ins.eliminable() || lvreg.find(i) != lvreg.end()) {
+				live = true;
+			}
+			if (ins.op == Opcode::MOVE && ins.oper[1] == Operand::LOCAL) {
+				int def = ins.oper[1].value;
+				if (cur.find(def) != cur.end()) {
+					cur.erase(def);
+					live = true;
+				}
+			}
+			if (live) {
+				for (int o = 0; o < 2; ++o) if (ins.isrightvalue(o)) {
+					switch(ins.oper[o]) {
+					case Operand::LOCAL: {
+						int use = ins.oper[o].value;
+						cur.insert(use);
+						break;
+					}
+					}
+				}
+			} else {
+				/* Eliminate */
+				long long back_addr = ins.addr;
+				ins = Instruction();
+				ins.op.type = Opcode::NOP;
+				ins.addr = back_addr;
+				++elimin_count;
+			}
+		}
+	}
+	fprintf(stderr, "Function: %d\n", enter);
+	fprintf(stderr, "Number of statements eliminated: %d\n", elimin_count);
 }
 
 Block::Block(Function* func, std::vector<Instruction> instr_)
