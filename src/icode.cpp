@@ -778,13 +778,17 @@ void Function::constant_propagate()
 void Function::dead_eliminate()
 {
 	typedef std::set<int> iset; // Set of variable definitions
-	int elimin_count = 0;
+	int elimin_count_in = 0, elimin_count_out = 0;
 	std::vector<Instruction> &instr = prog->instr;
 	std::map<Block*, iset> lv; // Live Variables OUT
 	std::set<int> lvreg; // Live Temporary Registers
+	std::set<Block*> inloop; // Block in Loops
 	for (auto pb: blocks) {
 		Block *b = pb.second;
 		lv[b] = iset();
+	}
+	for (auto s: loops) for (Block *b: s.second) {
+		inloop.insert(b);
 	}
 	bool change;
 	do {
@@ -836,6 +840,7 @@ void Function::dead_eliminate()
 	for (auto ib = blocks.rbegin(); ib != blocks.rend(); ++ib) {
 		Block *b = ib->second;
 		iset cur = lv[b]; // Copy
+		bool inl = (inloop.find(b) != inloop.end());
 		for (int j = (int)b->instr.size() - 1; j >= 0; --j) {
 			int i = b->instr[j].addr; // Instruction address;
 			Instruction &ins = instr[i]; // Instruction in Program
@@ -866,13 +871,17 @@ void Function::dead_eliminate()
 				ins = Instruction();
 				ins.op.type = Opcode::NOP;
 				ins.addr = back_addr;
-				++elimin_count;
+				if (inl)
+					++elimin_count_in;
+				else
+					++elimin_count_out;
 			}
 		}
 	}
 	if (output_report) {
 		fprintf(stderr, "Function: %d\n", enter);
-		fprintf(stderr, "Number of statements eliminated: %d\n", elimin_count);
+		fprintf(stderr, "Number of statements eliminated in SCR: %d\n", elimin_count_in);
+		fprintf(stderr, "Number of statements eliminated not in SCR: %d\n", elimin_count_out);
 	}
 }
 
