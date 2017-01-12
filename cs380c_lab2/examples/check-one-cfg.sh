@@ -3,7 +3,7 @@
 # $Id: check-one.sh 818 2007-09-02 17:45:21Z suriya $
 
 C_SUBSET_COMPILER=../src/csc
-THREE_ADDR_TO_C_TRANSLATOR=../../src/cfg
+THREE_ADDR_TO_C_TRANSLATOR="../lab2/run.sh -backend=cfg"
 
 [ $# -ne 1 ] && { echo "Usage $0 PROGRAM" >&2; exit 1; }
 

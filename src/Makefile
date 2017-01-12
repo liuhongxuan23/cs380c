@@ -3,7 +3,7 @@ CXXFLAGS=-std=gnu++11 -g
 
 .PHONY: all
 
-all: ccode cfg dom constpropa debug
+all: ccode cfg dom constpropa debug main
 
 ccode: icode.o ssa.o ccode.o
 
@@ -14,6 +14,8 @@ cfg: icode.o cfg.o
 debug: icode.o ssa.o debug.o
 
 constpropa: icode.o constpropa.o
+
+main: icode.o main.o
 
 clean:
 	-rm *.o

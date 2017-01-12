@@ -8,6 +8,8 @@
 
 #include "icode.h"
 
+bool output_report = false;
+
 const char *const Opcode::opname[OPCODE_MAX] = {
 	[UNKNOWN]="unknown",
 	[ADD]="add",
