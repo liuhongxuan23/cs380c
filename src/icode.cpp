@@ -348,8 +348,6 @@ bool Instruction::isrightvalue(int o) const
 		case Opcode::MOVE:
 		case Opcode::WRITE:
 		case Opcode::PARAM:
-		case Opcode::ENTER:
-		case Opcode::RET:
 			return true;
 		}
 		return false;
@@ -456,11 +454,15 @@ void Program::constant_propagate()
 	for (auto f: funcs) {
 		int st = f.first, ed = f.second;
 		int fsize = instr[st].oper[0].value / 8;
+		int narg = instr[ed-1].oper[0].value / 8;
 		std::vector<iset> rd(ed - st, iset()); // Reaching Definition IN
+		for (int i = 0; i < narg; ++i)
+			// Instruction after enter
+			rd[1].insert(std::make_pair((i+2)*8, st));
 		bool change;
 		do {
 			change = false;
-			for (int i = st; i < ed; ++i) {
+			for (int i = st+1; i < ed; ++i) {
 				iset &in = rd[i-st];
 				int def = 0;
 				if (instr[i].op == Opcode::MOVE && instr[i].oper[1] == Operand::LOCAL) {
@@ -500,7 +502,7 @@ void Program::constant_propagate()
 		} while (change);
 		do {
 			change = false;
-			for (int i = st; i < ed; ++i) {
+			for (int i = st+1; i < ed; ++i) {
 				Instruction &ins = instr[i];
 				iset &in = rd[i-st];
 				for (int o = 0; o < 2; ++o) if (ins.isrightvalue(o)) switch(ins.oper[o].type) {
@@ -510,8 +512,8 @@ void Program::constant_propagate()
 					auto ved = in.lower_bound(std::make_pair(var, INT_MAX));
 					if (vst != ved && --ved == vst) {
 						Instruction &ins2 = instr[vst->second];
-						assert(ins2.op == Opcode::MOVE);
-						if (ins2.oper[0].type == Operand::CONST) {
+						assert(ins2.op == Opcode::MOVE || ins2.op == Opcode::ENTER);
+						if (ins.op == Opcode::MOVE && ins2.oper[0].type == Operand::CONST) {
 							ins.oper[o] = ins2.oper[0];
 							change = true;
 						}
