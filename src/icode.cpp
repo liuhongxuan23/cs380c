@@ -436,108 +436,8 @@ void Program::build_domtree()
 
 void Program::constant_propagate()
 {
-	int enter = -1;
-	std::list<std::pair<int, int> > funcs;
-
-	for (int i = 1; i < instr.size(); ++i) {
-		if (instr[i].op == Opcode::ENTER) {
-			assert(enter == -1);
-			enter = i;
-		} else if (instr[i].op == Opcode::RET) {
-			assert(enter > 0);
-			funcs.push_back(std::make_pair(enter, i+1));
-			enter = -1;
-		}
-	}
-
-	typedef std::set<std::pair<int, int> > iset;
-	for (auto f: funcs) {
-		int propa_count = 0;
-		int st = f.first, ed = f.second;
-		int fsize = instr[st].oper[0].value / 8;
-		int narg = instr[ed-1].oper[0].value / 8;
-		std::vector<iset> rd(ed - st, iset()); // Reaching Definition IN
-		for (int i = 0; i < narg; ++i)
-			// Instruction after enter
-			rd[1].insert(std::make_pair((i+2)*8, st));
-		bool change;
-		do {
-			change = false;
-			for (int i = st+1; i < ed; ++i) {
-				iset &in = rd[i-st];
-				int def = 0;
-				if (instr[i].op == Opcode::MOVE && instr[i].oper[1] == Operand::LOCAL) {
-					def = instr[i].oper[1].value;
-					assert(def != 0);
-				}
-				std::pair<int, int> defp = std::make_pair(def, i);
-				int next_br = instr[i].get_branch_target();
-				if (next_br > 0) {
-					iset &to = rd[next_br-st];
-					for (auto pp: in) if (pp.first != def) {
-						if (to.find(pp) == to.end()) {
-							to.insert(pp);
-							change = true;
-						}
-					}
-					if (def != 0 && to.find(defp) == to.end()) {
-						to.insert(defp);
-						change = true;
-					}
-				}
-				int next_seq = instr[i].get_next_instr();
-				if (next_seq > 0) {
-					iset &to = rd[next_seq-st];
-					for (auto pp: in) if (pp.first != def) {
-						if (to.find(pp) == to.end()) {
-							to.insert(pp);
-							change = true;
-						}
-					}
-					if (def != 0 && to.find(defp) == to.end()) {
-						to.insert(defp);
-						change = true;
-					}
-				}
-			}
-		} while (change);
-		do {
-			change = false;
-			for (int i = st+1; i < ed; ++i) {
-				Instruction &ins = instr[i];
-				iset &in = rd[i-st];
-				for (int o = 0; o < 2; ++o) if (ins.isrightvalue(o)) switch(ins.oper[o].type) {
-				case Operand::LOCAL: {
-					int var = ins.oper[o].value;
-					auto vst = in.lower_bound(std::make_pair(var, INT_MIN));
-					auto ved = in.lower_bound(std::make_pair(var, INT_MAX));
-					if (vst != ved && --ved == vst) {
-						Instruction &ins2 = instr[vst->second];
-						assert(ins2.op == Opcode::MOVE || ins2.op == Opcode::ENTER);
-						if (ins2.op == Opcode::MOVE && ins2.oper[0].type == Operand::CONST) {
-							ins.oper[o] = ins2.oper[0];
-							change = true;
-							propa_count++;
-						}
-					}
-					break;
-				}
-				case Operand::REG:{
-					Instruction &ins2 = instr[ins.oper[o].value];
-					if (ins2.isconst()) {
-						ins.oper[o] = Operand();
-						ins.oper[o].type = Operand::CONST;
-						ins.oper[o].value = ins2.constvalue();
-						change = true;
-						propa_count++;
-					}
-				}
-				}
-			}
-		} while(change);
-		fprintf(stderr, "Function: %d\n", st);
-		fprintf(stderr, "Number of constants propagated: %d\n", propa_count);
-	}
+	for (Function *f: funcs)
+		f->constant_propagate();
 }
 
 Program::~Program()
@@ -546,11 +446,12 @@ Program::~Program()
         delete func;
 }
 
-Function::Function(Program* prog, int enter, int exit)
-    : prog(prog)
+Function::Function(Program* prog, int a, int b)
+    : prog(prog), enter(a), exit(b)
 {
     assert(prog->instr[enter].op == Opcode::ENTER);
-    frame_size = prog->instr[enter].oper[0].value;
+    frame_size = prog->instr[enter].oper[0].value / 8;
+    arg_count = prog->instr[exit].oper[0].value / 8;
     is_main = prog->instr[enter - 1].op == Opcode::ENTRYPC;
 
     std::set<int> bounds;  // boundaries of blocks
@@ -658,6 +559,98 @@ void Function::build_domtree()
 			p->domc.push_back(b);
 		}
 	}
+}
+
+void Function::constant_propagate()
+{
+	typedef std::set<std::pair<int, int> > iset; // Set of variable definitions
+	int propa_count = 0;
+	std::vector<Instruction> &instr = prog->instr;
+	std::map<Block*, iset> rd; // Reaching Definition IN
+	for (auto pb: blocks) {
+		Block *b = pb.second;
+		rd[b] = iset();
+	}
+	for (int i = 0; i < arg_count; ++i)
+		// Insert function agruments
+		// Instruction after enter
+		rd[blocks[enter]].insert(std::make_pair((i+2)*8, enter));
+	bool change;
+	do {
+		change = false;
+		for (auto pb: blocks) {
+			Block *b = pb.second;
+			iset cur = rd[b]; // Copy
+			for (int j = 0; j < b->instr.size(); ++j) {
+				int i = b->instr[j].addr; // Instruction address;
+				Instruction &ins = instr[i]; // Instruction in Program
+				if (ins.op == Opcode::MOVE && ins.oper[1] == Operand::LOCAL) {
+					int def = ins.oper[1].value;
+					auto vst = cur.lower_bound(std::make_pair(def, INT_MIN));
+					auto ved = cur.lower_bound(std::make_pair(def, INT_MAX));
+					cur.erase(vst, ved);
+					cur.insert(std::make_pair(def, i));
+				}
+			}
+			for (int t = 0; t < 2; ++t) {
+				Block *b2 = t == 0 ? b->seq_next : b->br_next;
+				if (b2 != NULL) {
+					iset &in2 = rd[b2];
+					for (auto i: cur) if (in2.find(i) == in2.end()) {
+						change = true;
+						in2.insert(i);
+					}
+				}
+			}
+		}
+	} while (change);
+	do {
+		change = false;
+		for (auto pb: blocks) {
+			Block *b = pb.second;
+			iset cur = rd[b]; // Copy
+			for (int j = 0; j < b->instr.size(); ++j) {
+				int i = b->instr[j].addr; // Instruction address;
+				Instruction &ins = instr[i]; // Instruction in Program
+				for (int o = 0; o < 2; ++o) if (ins.isrightvalue(o)) switch(ins.oper[o].type) {
+				case Operand::LOCAL: {
+					int var = ins.oper[o].value;
+					auto vst = cur.lower_bound(std::make_pair(var, INT_MIN));
+					auto ved = cur.lower_bound(std::make_pair(var, INT_MAX));
+					if (vst != ved && --ved == vst) {
+						Instruction &ins2 = instr[vst->second];
+						assert(ins2.op == Opcode::MOVE || ins2.op == Opcode::ENTER);
+						if (ins2.op == Opcode::MOVE && ins2.oper[0].type == Operand::CONST) {
+							ins.oper[o] = ins2.oper[0];
+							change = true;
+							propa_count++;
+						}
+					}
+					break;
+				}
+				case Operand::REG:{
+					Instruction &ins2 = instr[ins.oper[o].value];
+					if (ins2.isconst()) {
+						ins.oper[o] = Operand();
+						ins.oper[o].type = Operand::CONST;
+						ins.oper[o].value = ins2.constvalue();
+						change = true;
+						propa_count++;
+					}
+				}
+				}
+				if (ins.op == Opcode::MOVE && ins.oper[1] == Operand::LOCAL) {
+					int def = ins.oper[1].value;
+					auto vst = cur.lower_bound(std::make_pair(def, INT_MIN));
+					auto ved = cur.lower_bound(std::make_pair(def, INT_MAX));
+					cur.erase(vst, ved);
+					cur.insert(std::make_pair(def, i));
+				}
+			}
+		}
+	} while(change);
+	fprintf(stderr, "Function: %d\n", enter);
+	fprintf(stderr, "Number of constants propagated: %d\n", propa_count);
 }
 
 Block::Block(Function* func, std::vector<Instruction> instr_)

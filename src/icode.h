@@ -113,16 +113,20 @@ public:
 
 class Function {
 public:
-    Function(Program* parent, int enter, int exit);
+    Function(Program* parent, int a, int b);
     ~Function();
 
     Program* prog;
+    int enter;
+    int exit;
     int frame_size;
+    int arg_count;
     bool is_main;
     std::map<int, Block*> blocks;
     Block* entry;
 
     void build_domtree();
+    void constant_propagate();
 
     // SSA
     void place_phi();
