@@ -1,7 +1,4 @@
 *.o
-ccode
-cfg
 dom
 debug
-constpropa
 main
