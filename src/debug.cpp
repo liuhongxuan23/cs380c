@@ -13,8 +13,9 @@ int main() {
     prog.ssa_rename_var();
 
     prog.ssa_constant_propagate();
+    prog.remove_phi();
 
-    prog.ssa_icode(stdout);
+    prog.icode(stdout);
 
     //    printf("Basic blocks:");
     //    for (auto iter : func->blocks)

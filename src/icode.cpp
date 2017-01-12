@@ -55,6 +55,8 @@ const int Opcode::operand_count[OPCODE_MAX] = {
 	[ENTRYPC]=0,
 };
 
+bool Program::ssa_mode;
+
 Opcode::Opcode (const char *name):
 	Opcode()
 {
@@ -116,7 +118,7 @@ void Operand::icode (FILE *out) const
 	} else {
 		if (tag.empty())
 			fprintf(out, "%lld", value);
-		else if (ssa_idx == -1)
+		else if (ssa_idx == -1 || !Program::ssa_mode)
 			fprintf(out, "%s#%lld", tag.c_str(), value);
                 else
                         fprintf(out, "%s$%d", tag.c_str(), ssa_idx);
@@ -181,8 +183,6 @@ void Instruction::ccode (FILE *out) const
 		fprintf(out, "void instr_%lld() {\n", addr);
 	} else if (op == Opcode::ENTRYPC) {
 		fprintf(out, "void instr_%lld();\nvoid (*entry)() = instr_%lld", addr + 1, addr + 1);
-	} else if (op == Opcode::NOP) {
-		/* Nothing */
 	} else {
 		fprintf(out, "instr_%lld: ", addr);
 	}
@@ -256,9 +256,7 @@ void Instruction::ccode (FILE *out) const
 		break;
 	}
 
-	if (op != Opcode::NOP) {
-		fprintf(out, ";\n");
-	}
+	fprintf(out, ";\n");
 	if (op == Opcode::RET) {
 		fprintf(out, "}\n");
 	}
@@ -273,6 +271,14 @@ int Instruction::get_branch_target () const
 	if (op.type == Opcode::RET)
 		return 0;
 	return -1;
+}
+
+void Instruction::set_br_addr(long long addr)
+{
+    if (op.type == Opcode::BR)
+        oper[0].value = addr;
+    else if (op.type == Opcode::BLBC || op.type == Opcode::BLBS)
+        oper[1].value = addr;
 }
 
 int Instruction::get_next_instr() const
@@ -344,6 +350,7 @@ bool Instruction::isrightvalue(int o) const
 		case Opcode::CMPLT:
 		case Opcode::BLBC:
 		case Opcode::BLBS:
+		case Opcode::LOAD:
 		case Opcode::STORE:
 		case Opcode::MOVE:
 		case Opcode::WRITE:
@@ -361,9 +368,29 @@ bool Instruction::isrightvalue(int o) const
 		case Opcode::CMPEQ:
 		case Opcode::CMPLE:
 		case Opcode::CMPLT:
+		case Opcode::STORE:
 			return true;
 		}
 		return false;
+	}
+	return false;
+}
+
+bool Instruction::eliminable() const
+{
+	switch (op) {
+	case Opcode::ADD:
+	case Opcode::SUB:
+	case Opcode::MUL:
+	case Opcode::DIV:
+	case Opcode::MOD:
+	case Opcode::NEG:
+	case Opcode::CMPEQ:
+	case Opcode::CMPLE:
+	case Opcode::CMPLT:
+	case Opcode::LOAD:
+	case Opcode::MOVE:
+		return true;
 	}
 	return false;
 }
@@ -387,9 +414,24 @@ Program::Program (FILE *in):
 
 void Program::icode (FILE *out) const
 {
-	for (auto p = ++instr.begin(); p != instr.end(); ++p)
-		p->icode(out);
+    ssa_mode = false;
+    fputs("instr 1: nop\n", out);
+
+    for (Function* func : funcs) {
+        if (func->is_main)
+            fprintf(out, "instr %lld: entrypc\n", func->entry->addr() - 1);
+
+        for (auto& addr_block : func->blocks) {
+            Block* block = addr_block.second;
+            for (int i = 0; i < block->instr.size(); ++i)
+                if (block->instr[i].op != Opcode::NOP)
+                    block->instr[i].icode(out);
+        }
+    }
+
+    fprintf(out, "instr %d: nop\n", (int)instr.size() - 1);
 }
+
 
 void Program::ccode (FILE *out) const
 {
@@ -412,8 +454,17 @@ void Program::ccode (FILE *out) const
 	);
 
 
-	for (auto p = ++instr.begin(); p != instr.end(); ++p)
-		p->ccode(out);
+	bool in_function = false;
+	for (auto p = ++instr.begin(); p != instr.end(); ++p) {
+		if (p->op == Opcode::ENTER) {
+			in_function = true;
+		} else if (p->op == Opcode::RET) {
+			in_function = false;
+		}
+		if (in_function || p->op != Opcode::NOP) {
+			p->ccode(out);
+		}
+	}
 
 	fprintf(out,"void main()\n{\n\t(*entry)();\n}\n");
 }
@@ -443,103 +494,14 @@ void Program::build_domtree()
 
 void Program::constant_propagate()
 {
-	int enter = -1;
-	std::list<std::pair<int, int> > funcs;
+	for (Function *f: funcs)
+		f->constant_propagate();
+}
 
-	for (int i = 1; i < instr.size(); ++i) {
-		if (instr[i].op == Opcode::ENTER) {
-			assert(enter == -1);
-			enter = i;
-		} else if (instr[i].op == Opcode::RET) {
-			assert(enter > 0);
-			funcs.push_back(std::make_pair(enter, i+1));
-			enter = -1;
-		}
-	}
-
-	typedef std::set<std::pair<int, int> > iset;
-	for (auto f: funcs) {
-		int st = f.first, ed = f.second;
-		int fsize = instr[st].oper[0].value / 8;
-		int narg = instr[ed-1].oper[0].value / 8;
-		std::vector<iset> rd(ed - st, iset()); // Reaching Definition IN
-		for (int i = 0; i < narg; ++i)
-			// Instruction after enter
-			rd[1].insert(std::make_pair((i+2)*8, st));
-		bool change;
-		do {
-			change = false;
-			for (int i = st+1; i < ed; ++i) {
-				iset &in = rd[i-st];
-				int def = 0;
-				if (instr[i].op == Opcode::MOVE && instr[i].oper[1] == Operand::LOCAL) {
-					def = instr[i].oper[1].value;
-					assert(def != 0);
-				}
-				std::pair<int, int> defp = std::make_pair(def, i);
-				int next_br = instr[i].get_branch_target();
-				if (next_br > 0) {
-					iset &to = rd[next_br-st];
-					for (auto pp: in) if (pp.first != def) {
-						if (to.find(pp) == to.end()) {
-							to.insert(pp);
-							change = true;
-						}
-					}
-					if (def != 0 && to.find(defp) == to.end()) {
-						to.insert(defp);
-						change = true;
-					}
-				}
-				int next_seq = instr[i].get_next_instr();
-				if (next_seq > 0) {
-					iset &to = rd[next_seq-st];
-					for (auto pp: in) if (pp.first != def) {
-						if (to.find(pp) == to.end()) {
-							to.insert(pp);
-							change = true;
-						}
-					}
-					if (def != 0 && to.find(defp) == to.end()) {
-						to.insert(defp);
-						change = true;
-					}
-				}
-			}
-		} while (change);
-		do {
-			change = false;
-			for (int i = st+1; i < ed; ++i) {
-				Instruction &ins = instr[i];
-				iset &in = rd[i-st];
-				for (int o = 0; o < 2; ++o) if (ins.isrightvalue(o)) switch(ins.oper[o].type) {
-				case Operand::LOCAL: {
-					int var = ins.oper[o].value;
-					auto vst = in.lower_bound(std::make_pair(var, INT_MIN));
-					auto ved = in.lower_bound(std::make_pair(var, INT_MAX));
-					if (vst != ved && --ved == vst) {
-						Instruction &ins2 = instr[vst->second];
-						assert(ins2.op == Opcode::MOVE || ins2.op == Opcode::ENTER);
-						if (ins.op == Opcode::MOVE && ins2.oper[0].type == Operand::CONST) {
-							ins.oper[o] = ins2.oper[0];
-							change = true;
-						}
-					}
-					break;
-				}
-				case Operand::REG:{
-					Instruction &ins2 = instr[ins.oper[o].value];
-					if (ins2.isconst()) {
-						ins.oper[o] = Operand();
-						ins.oper[o].type = Operand::CONST;
-						ins.oper[o].value = ins2.constvalue();
-						change = true;
-					}
-				}
-				}
-			}
-		} while(change);
-	}
+void Program::dead_eliminate()
+{
+	for (Function *f: funcs)
+		f->dead_eliminate();
 }
 
 void Operand::to_const(long long val)
@@ -556,11 +518,12 @@ Program::~Program()
         delete func;
 }
 
-Function::Function(Program* prog, int enter, int exit)
-    : prog(prog)
+Function::Function(Program* prog, int a, int b)
+    : prog(prog), enter(a), exit(b)
 {
     assert(prog->instr[enter].op == Opcode::ENTER);
-    frame_size = prog->instr[enter].oper[0].value;
+    frame_size = prog->instr[enter].oper[0].value / 8;
+    arg_count = prog->instr[exit].oper[0].value / 8;
     is_main = prog->instr[enter - 1].op == Opcode::ENTRYPC;
 
     std::set<int> bounds;  // boundaries of blocks
@@ -668,6 +631,212 @@ void Function::build_domtree()
 			p->domc.push_back(b);
 		}
 	}
+}
+
+void Function::constant_propagate()
+{
+	typedef std::set<std::pair<int, int> > iset; // Set of variable definitions
+	int propa_count = 0;
+	std::vector<Instruction> &instr = prog->instr;
+	std::map<Block*, iset> rd; // Reaching Definition IN
+	for (auto pb: blocks) {
+		Block *b = pb.second;
+		rd[b] = iset();
+	}
+	for (int i = 0; i < arg_count; ++i)
+		// Insert function agruments
+		// Instruction after enter
+		rd[blocks[enter]].insert(std::make_pair((i+2)*8, enter));
+	bool change;
+	do {
+		change = false;
+		for (auto pb: blocks) {
+			Block *b = pb.second;
+			iset cur = rd[b]; // Copy
+			for (int j = 0; j < b->instr.size(); ++j) {
+				int i = b->instr[j].addr; // Instruction address;
+				Instruction &ins = instr[i]; // Instruction in Program
+				if (ins.op == Opcode::MOVE && ins.oper[1] == Operand::LOCAL) {
+					int def = ins.oper[1].value;
+					auto vst = cur.lower_bound(std::make_pair(def, INT_MIN));
+					auto ved = cur.lower_bound(std::make_pair(def, INT_MAX));
+					cur.erase(vst, ved);
+					cur.insert(std::make_pair(def, i));
+				}
+			}
+			for (int t = 0; t < 2; ++t) {
+				Block *b2 = t == 0 ? b->seq_next : b->br_next;
+				if (b2 != NULL) {
+					iset &in2 = rd[b2];
+					for (auto i: cur) if (in2.find(i) == in2.end()) {
+						change = true;
+						in2.insert(i);
+					}
+				}
+			}
+		}
+	} while (change);
+	do {
+		change = false;
+		for (auto pb: blocks) {
+			Block *b = pb.second;
+			iset cur = rd[b]; // Copy
+			for (int j = 0; j < b->instr.size(); ++j) {
+				int i = b->instr[j].addr; // Instruction address;
+				Instruction &ins = instr[i]; // Instruction in Program
+				for (int o = 0; o < 2; ++o) if (ins.isrightvalue(o)) switch(ins.oper[o].type) {
+				case Operand::LOCAL: {
+					int var = ins.oper[o].value;
+					auto vst = cur.lower_bound(std::make_pair(var, INT_MIN));
+					auto ved = cur.lower_bound(std::make_pair(var, INT_MAX));
+					bool flag = true;
+					long long value = 0;
+					for (auto v = vst; v != ved; ++v) {
+						Instruction &ins2 = instr[v->second];
+						assert(ins2.op == Opcode::MOVE || ins2.op == Opcode::ENTER);
+						if (ins2.op == Opcode::MOVE && ins2.oper[0].type == Operand::CONST) {
+							if (v == vst) {
+								value = ins2.oper[0].value;
+							} else if (value != ins2.oper[0].value) {
+								flag = false;
+							}
+						} else {
+							flag = false;
+						}
+						if (!flag)
+							break;
+					}
+					if (flag) {
+						ins.oper[o] = Operand();
+						ins.oper[o].type = Operand::CONST;
+						ins.oper[o].value = value;
+						change = true;
+						propa_count++;
+					}
+					break;
+				}
+				case Operand::REG:{
+					Instruction &ins2 = instr[ins.oper[o].value];
+					if (ins2.isconst()) {
+						ins.oper[o] = Operand();
+						ins.oper[o].type = Operand::CONST;
+						ins.oper[o].value = ins2.constvalue();
+						change = true;
+						propa_count++;
+					}
+				}
+				}
+				if (ins.op == Opcode::MOVE && ins.oper[1] == Operand::LOCAL) {
+					int def = ins.oper[1].value;
+					auto vst = cur.lower_bound(std::make_pair(def, INT_MIN));
+					auto ved = cur.lower_bound(std::make_pair(def, INT_MAX));
+					cur.erase(vst, ved);
+					cur.insert(std::make_pair(def, i));
+				}
+			}
+		}
+	} while(change);
+	fprintf(stderr, "Function: %d\n", enter);
+	fprintf(stderr, "Number of constants propagated: %d\n", propa_count);
+}
+
+void Function::dead_eliminate()
+{
+	typedef std::set<int> iset; // Set of variable definitions
+	int elimin_count = 0;
+	std::vector<Instruction> &instr = prog->instr;
+	std::map<Block*, iset> lv; // Live Variables OUT
+	std::set<int> lvreg; // Live Temporary Registers
+	for (auto pb: blocks) {
+		Block *b = pb.second;
+		lv[b] = iset();
+	}
+	bool change;
+	do {
+		change = false;
+		for (auto ib = blocks.rbegin(); ib != blocks.rend(); ++ib) {
+			Block *b = ib->second;
+			iset cur = lv[b]; // Copy
+			for (int j = (int)b->instr.size() - 1; j >= 0; --j) {
+				int i = b->instr[j].addr; // Instruction address;
+				Instruction &ins = instr[i]; // Instruction in Program
+				bool live = false;
+				if (!ins.eliminable() || lvreg.find(i) != lvreg.end()) {
+					live = true;
+				}
+				if (ins.op == Opcode::MOVE && ins.oper[1] == Operand::LOCAL) {
+					int def = ins.oper[1].value;
+					if (cur.find(def) != cur.end()) {
+						cur.erase(def);
+						live = true;
+					}
+				}
+				if (live) for (int o = 0; o < 2; ++o) if (ins.isrightvalue(o)) {
+					switch(ins.oper[o]) {
+					case Operand::LOCAL: {
+						int use = ins.oper[o].value;
+						cur.insert(use);
+						break;
+					}
+					case Operand::REG: {
+						int reg = ins.oper[o].value;
+						if (lvreg.find(reg) == lvreg.end()) {
+							lvreg.insert(reg);
+							change = true;
+						}
+						break;
+					}
+					}
+				}
+			}
+			for (Block *b2: b->prevs) {
+				iset &out2 = lv[b2];
+				for (auto i: cur) if (out2.find(i) == out2.end()) {
+					change = true;
+					out2.insert(i);
+				}
+			}
+		}
+	} while (change);
+	for (auto ib = blocks.rbegin(); ib != blocks.rend(); ++ib) {
+		Block *b = ib->second;
+		iset cur = lv[b]; // Copy
+		for (int j = (int)b->instr.size() - 1; j >= 0; --j) {
+			int i = b->instr[j].addr; // Instruction address;
+			Instruction &ins = instr[i]; // Instruction in Program
+			bool live = false;
+			if (!ins.eliminable() || lvreg.find(i) != lvreg.end()) {
+				live = true;
+			}
+			if (ins.op == Opcode::MOVE && ins.oper[1] == Operand::LOCAL) {
+				int def = ins.oper[1].value;
+				if (cur.find(def) != cur.end()) {
+					cur.erase(def);
+					live = true;
+				}
+			}
+			if (live) {
+				for (int o = 0; o < 2; ++o) if (ins.isrightvalue(o)) {
+					switch(ins.oper[o]) {
+					case Operand::LOCAL: {
+						int use = ins.oper[o].value;
+						cur.insert(use);
+						break;
+					}
+					}
+				}
+			} else {
+				/* Eliminate */
+				long long back_addr = ins.addr;
+				ins = Instruction();
+				ins.op.type = Opcode::NOP;
+				ins.addr = back_addr;
+				++elimin_count;
+			}
+		}
+	}
+	fprintf(stderr, "Function: %d\n", enter);
+	fprintf(stderr, "Number of statements eliminated: %d\n", elimin_count);
 }
 
 Block::Block(Function* func, std::vector<Instruction> instr_)

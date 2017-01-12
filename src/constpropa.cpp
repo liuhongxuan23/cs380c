@@ -3,7 +3,8 @@
 
 int main() {
 	Program prog(stdin);
+	prog.find_functions();
 	prog.constant_propagate();
-	prog.ccode(stdout);
+	prog.icode(stdout);
 	return 0;
 }

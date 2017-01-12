@@ -69,9 +69,11 @@ struct Instruction {
 	operator bool() const { return bool(op); }
         int get_branch_target () const;
 	int get_next_instr() const;
+        void set_br_addr(long long addr);
 	bool isconst() const;
 	long long constvalue() const;
 	bool isrightvalue(int o) const;
+	bool eliminable() const;
 
         void erase();
 };
@@ -121,20 +123,26 @@ public:
 
 class Function {
 public:
-    Function(Program* parent, int enter, int exit);
+    Function(Program* parent, int a, int b);
     ~Function();
 
     Program* prog;
+    int enter;
+    int exit;
     int frame_size;
+    int arg_count;
     bool is_main;
     std::map<int, Block*> blocks;
     Block* entry;
 
     void build_domtree();
+    void constant_propagate();
+    void dead_eliminate();
 
     // SSA
     std::unordered_map<int, std::string> offset2tag;
     void place_phi();
+    void remove_phi();
     void ssa_constant_propagate();
 };
 
@@ -149,13 +157,19 @@ struct Program {
         void find_functions();
 	void build_domtree();
 	void constant_propagate();
+	void dead_eliminate();
 
         // SSA
+        int instr_cnt = 0;
+
         void compute_df();
         void find_defs();
         void place_phi();
+        void remove_phi();
         void ssa_rename_var();
         void ssa_constant_propagate();
 
         void ssa_icode(FILE* out);
+
+        static bool ssa_mode;
 };

@@ -101,6 +101,51 @@ static Operand reg_oper(const Instruction& in)
     return r;
 }
 
+void Function::remove_phi()
+{
+    Instruction bak;
+    bool addr_updated;
+
+    for (auto& addr_block : blocks) {
+        Block* b = addr_block.second;
+
+        for (int i = 0; i < b->prevs.size(); ++i) {
+            Block* prev = b->prevs[i];
+            if (prev->br_next == b) {
+                bak = prev->instr.back();
+                prev->instr.pop_back();
+                addr_updated = prev->instr.empty();
+
+            } else assert(prev->seq_next == b);
+
+            for (auto var_phi : b->phi) {
+                int var = var_phi.first;
+                Phi& phi = var_phi.second;
+                if (phi.r.empty()) continue;
+
+                if (phi.r[i].type == Operand::CONST) {
+                    Instruction in;
+                    in.addr = prog->instr_cnt++;
+                    in.op.type = Opcode::MOVE;
+                    in.oper[0].type = Operand::CONST;
+                    in.oper[0].value = phi.r[i].value;
+                    in.oper[1].type = Operand::LOCAL;
+                    in.oper[1].value = var;
+                    in.oper[1].tag = offset2tag[var];
+                    prev->instr.push_back(in);
+                }
+            }
+
+            if (prev->br_next == b) {
+                prev->instr.push_back(bak);
+                if (addr_updated)
+                    for (Block* pp : prev->prevs)
+                        pp->instr.back().set_br_addr(prev->instr[0].addr);
+            }
+        }
+    }
+}
+
 static void rename_phi(Block* child, Block* parent, map<int, RenameStack>& stack)
 {
     if (child == nullptr) return;
@@ -213,6 +258,7 @@ void Function::ssa_constant_propagate()
 
 void Program::ssa_icode(FILE* out)
 {
+    ssa_mode = true;
     fputs("instr 1: nop\n", out);
 
     int n = instr.size();
@@ -290,6 +336,13 @@ void Program::place_phi()
 {
     for (Function* func : funcs)
         func->place_phi();
+}
+
+void Program::remove_phi()
+{
+    instr_cnt = instr.size();
+    for (Function* func : funcs)
+        func->remove_phi();
 }
 
 void Program::ssa_rename_var()
