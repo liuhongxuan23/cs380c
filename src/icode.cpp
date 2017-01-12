@@ -698,8 +698,10 @@ void Function::constant_propagate()
 			}
 		}
 	} while(change);
-	fprintf(stderr, "Function: %d\n", enter);
-	fprintf(stderr, "Number of constants propagated: %d\n", propa_count);
+	if (output_report) {
+		printf("Function: %d\n", enter);
+		printf("Number of constants propagated: %d\n", propa_count);
+	}
 }
 
 void Function::dead_eliminate()
@@ -797,8 +799,10 @@ void Function::dead_eliminate()
 			}
 		}
 	}
-	fprintf(stderr, "Function: %d\n", enter);
-	fprintf(stderr, "Number of statements eliminated: %d\n", elimin_count);
+	if (output_report) {
+		fprintf(stderr, "Function: %d\n", enter);
+		fprintf(stderr, "Number of statements eliminated: %d\n", elimin_count);
+	}
 }
 
 Block::Block(Function* func, std::vector<Instruction> instr_)
