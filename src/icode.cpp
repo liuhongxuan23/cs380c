@@ -452,6 +452,7 @@ void Program::constant_propagate()
 
 	typedef std::set<std::pair<int, int> > iset;
 	for (auto f: funcs) {
+		int propa_count = 0;
 		int st = f.first, ed = f.second;
 		int fsize = instr[st].oper[0].value / 8;
 		int narg = instr[ed-1].oper[0].value / 8;
@@ -513,9 +514,10 @@ void Program::constant_propagate()
 					if (vst != ved && --ved == vst) {
 						Instruction &ins2 = instr[vst->second];
 						assert(ins2.op == Opcode::MOVE || ins2.op == Opcode::ENTER);
-						if (ins.op == Opcode::MOVE && ins2.oper[0].type == Operand::CONST) {
+						if (ins2.op == Opcode::MOVE && ins2.oper[0].type == Operand::CONST) {
 							ins.oper[o] = ins2.oper[0];
 							change = true;
+							propa_count++;
 						}
 					}
 					break;
@@ -527,11 +529,14 @@ void Program::constant_propagate()
 						ins.oper[o].type = Operand::CONST;
 						ins.oper[o].value = ins2.constvalue();
 						change = true;
+						propa_count++;
 					}
 				}
 				}
 			}
 		} while(change);
+		fprintf(stderr, "Function: %d\n", st);
+		fprintf(stderr, "Number of constants propagated: %d\n", propa_count);
 	}
 }
 

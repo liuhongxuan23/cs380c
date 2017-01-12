@@ -4,6 +4,6 @@
 int main() {
 	Program prog(stdin);
 	prog.constant_propagate();
-	prog.ccode(stdout);
+	prog.icode(stdout);
 	return 0;
 }
