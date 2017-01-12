@@ -2,7 +2,10 @@
 #include <string>
 #include <vector>
 #include <list>
+#include <stack>
 #include <map>
+#include <unordered_set>
+#include <unordered_map>
 
 struct Opcode {
 	enum Type {
@@ -42,8 +45,11 @@ struct Operand {
 	Operand (): type(UNKNOWN), value(0), tag() {}
 	Operand (const char *str);
 	operator Type() const { return type; }
-	void icode (FILE *out);
-	void ccode (FILE *out);
+	void icode (FILE *out) const;
+	void ccode (FILE *out) const;
+
+        // SSA
+        int ssa_idx = -1;
 };
 
 struct Instruction {
@@ -52,9 +58,9 @@ struct Instruction {
 	Operand oper[2];
 	Instruction (): addr(-1) {}
 	Instruction (FILE *in);
-	void icode (FILE *out);
-	void ccode (FILE *out);
-	operator bool() { return bool(op); }
+	void icode (FILE *out) const;
+	void ccode (FILE *out) const;
+	operator bool() const { return bool(op); }
         int get_branch_target () const;
 	int get_next_instr() const;
 	bool isconst() const;
@@ -65,6 +71,21 @@ struct Instruction {
 class Function;
 class Program;
 
+struct Phi {
+    int l;
+    std::vector<int> r;
+};
+
+struct RenameStack {
+    int cnt;
+    std::stack<int> stack;
+
+    RenameStack() : cnt(0) { stack.push(0); }
+    int push() { stack.push(++cnt); return cnt; }
+    int pop() { int r = stack.top(); stack.pop(); return r; }
+    int top() { return stack.top(); }
+};
+
 class Block {
 public:
     Block(Function* func, std::vector<Instruction> instr);
@@ -73,9 +94,21 @@ public:
     Block* seq_next = nullptr;
     Block* br_next = nullptr;
     std::vector<Instruction> instr;
-    std::list<Block*> prevs;
-    Block *domf = NULL;
+    std::vector<Block*> prevs;
+    Block *idom = NULL;
     std::list<Block*> domc;
+
+    long long addr() const { return instr[0].addr; }
+
+    // SSA
+    std::vector<Block*> df;
+    std::unordered_set<std::string> defs;
+    std::unordered_map<std::string, Phi> phi;
+    long long ssa_addr = 0;
+
+    void compute_df();
+    void find_defs();
+    void ssa_rename_var(std::map<std::string, RenameStack>& stack);
 };
 
 class Function {
@@ -90,6 +123,9 @@ public:
     Block* entry;
 
     void build_domtree();
+
+    // SSA
+    void place_phi();
 };
 
 struct Program {
@@ -98,9 +134,17 @@ struct Program {
         Program () { instr.push_back(Instruction()); }
 	Program (FILE *in);
         ~Program ();
-	void icode (FILE *out);
-	void ccode (FILE *out);
+	void icode (FILE *out) const;
+	void ccode (FILE *out) const;
         void find_functions();
 	void build_domtree();
 	void constant_propagate();
+
+        // SSA
+        void compute_df();
+        void find_defs();
+        void place_phi();
+        void ssa_rename_var();
+
+        void ssa_icode(FILE* out);
 };

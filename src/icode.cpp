@@ -103,7 +103,7 @@ Operand::Operand (const char *str):
 	}
 }
 
-void Operand::icode (FILE *out)
+void Operand::icode (FILE *out) const
 {
 	if (type == REG) {
 		fprintf(out, "(%lld)", value);
@@ -114,14 +114,16 @@ void Operand::icode (FILE *out)
 	} else if (type == FP) {
 		fprintf(out, "FP");
 	} else {
-		if (!tag.empty())
-			fprintf(out, "%s#%lld", tag.c_str(), value);
-		else
+		if (tag.empty())
 			fprintf(out, "%lld", value);
+		else if (ssa_idx == -1)
+			fprintf(out, "%s#%lld", tag.c_str(), value);
+                else
+                        fprintf(out, "%s$%d", tag.c_str(), ssa_idx);
 	}
 }
 
-void Operand::ccode (FILE *out)
+void Operand::ccode (FILE *out) const
 {
 	if (type == REG) {
 		fprintf(out, "r[%lld]", value);
@@ -159,7 +161,7 @@ Instruction::Instruction (FILE *in):
 	}
 }
 
-void Instruction::icode (FILE *out)
+void Instruction::icode (FILE *out) const
 {
 	fprintf(out, "instr %lld: %s", addr, op.name());
 	if (oper[0]) {
@@ -173,7 +175,7 @@ void Instruction::icode (FILE *out)
 	fprintf(out, "\n");
 }
 
-void Instruction::ccode (FILE *out)
+void Instruction::ccode (FILE *out) const
 {
 	if (op == Opcode::ENTER) {
 		fprintf(out, "void instr_%lld() {\n", addr);
@@ -378,13 +380,13 @@ Program::Program (FILE *in):
 		instr.pop_back();
 }
 
-void Program::icode (FILE *out)
+void Program::icode (FILE *out) const
 {
 	for (auto p = ++instr.begin(); p != instr.end(); ++p)
 		p->icode(out);
 }
 
-void Program::ccode (FILE *out)
+void Program::ccode (FILE *out) const
 {
 
 	fprintf(out, "%s",
@@ -632,7 +634,7 @@ void Function::build_domtree()
 	} while(change);
 	for (auto pb: blocks) {
 		Block *b = pb.second;
-		b->domf = NULL;
+		b->idom = NULL;
 		b->domc.clear();
 	}
 	for (auto pb: blocks) {
@@ -645,7 +647,7 @@ void Function::build_domtree()
 		}
 		assert(bs.size() <= 1);
 		for (Block *p: bs) {
-			b->domf = p;
+			b->idom = p;
 			p->domc.push_back(b);
 		}
 	}
