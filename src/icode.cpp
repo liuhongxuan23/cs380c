@@ -4,6 +4,7 @@
 #include <cstring>
 #include <cassert>
 #include <climits>
+#include <cstdint>
 #include <set>
 
 #include "icode.h"
@@ -79,10 +80,10 @@ Operand::Operand (const char *str):
 		/* Nothing */
 	} else if (str[0] == '(') {
 		type = REG;
-		value = atoll(str+1);
+		_value = atoll(str+1);
 	} else if (str[0] == '[') {
 		type = LABEL;
-		value = atoll(str+1);
+		_value = atoll(str+1);
 	} else if (strcmp(str, "GP") == 0) {
 		type = GP;
 	} else if (strcmp(str, "FP") == 0) {
@@ -90,10 +91,10 @@ Operand::Operand (const char *str):
 	} else {
 		const char *sharp = strchr(str, '#');
 		if (sharp == NULL) {
-			value = atoll(str);
+			_value = atoll(str);
 			type = CONST;
 		} else {
-			value = atoll(sharp+1);
+			_value = atoll(sharp+1);
 			int len = sharp - str;
 			tag.assign(str, len);
 			if (len >= 5 && strncmp(str + len - 5, "_base", 5) == 0) {
@@ -109,48 +110,74 @@ Operand::Operand (const char *str):
 
 void Operand::icode (FILE *out) const
 {
-	if (type == REG) {
-		fprintf(out, "(%lld)", value);
-	} else if (type == LABEL) {
-		fprintf(out, "[%lld]", value);
-	} else if (type == GP) {
+	switch (type) {
+	case GP:
 		fprintf(out, "GP");
-	} else if (type == FP) {
+		break;
+	case FP:
 		fprintf(out, "FP");
-	} else {
+		break;
+	case CONST:
 		if (tag.empty())
-			fprintf(out, "%lld", value);
-		else if (ssa_idx == -1 || !Program::ssa_mode)
-			fprintf(out, "%s#%lld", tag.c_str(), value);
-                else
-                        fprintf(out, "%s$%d", tag.c_str(), ssa_idx);
+			fprintf(out, "%lld", value_const);
+		else
+			fprintf(out, "%s#%lld", tag.c_str(), value_const);
+		break;
+	case LOCAL:
+		if (ssa_idx == -1 || !Program::ssa_mode)
+			fprintf(out, "%s#%lld", var->name.c_str(), var->offset);
+		else
+			fprintf(out, "%s$%d", var->name.c_str(), ssa_idx);
+		break;
+	case REG:
+		fprintf(out, "(%d)", reg->name);
+		break;
+	case LABEL:
+		fprintf(out, "[%d]", jump->name);
+		break;
+	case FUNC:
+		fprintf(out, "[%lld]", value_const);
+		break;
+	default:
+		assert(true);
 	}
 }
 
 void Operand::ccode (FILE *out) const
 {
-	if (type == REG) {
-		fprintf(out, "r[%lld]", value);
-	} else if (type == LABEL) {
-		fprintf(out, "instr_%lld", value);
-	} else if (type == GP) {
+	switch (type) {
+	case GP:
 		fprintf(out, "GP");
-	} else if (type == FP) {
+		break;
+	case FP:
 		fprintf(out, "FP");
-	} else if (type == LOCAL) {
-		fprintf(out, "LOCAL(%lld)", value);
-	} else if (type == CONST) {
-		fprintf(out, "%lld", value);
+		break;
+	case CONST:
+		fprintf(out, "%lld", value_const);
+		break;
+	case LOCAL:
+		fprintf(out, "LOCAL(%lld)", var->offset);
+		break;
+	case REG:
+		fprintf(out, "r[%d]", reg->name);
+		break;
+	case LABEL:
+		fprintf(out, "instr_%d", jump->name);
+		break;
+	case FUNC:
+		fprintf(out, "func_%lld", value_const);
+		break;
+	default:
+		assert(false);
 	}
 }
 
-Instruction::Instruction (FILE *in):
-	Instruction()
+Instruction::Instruction (FILE *in)
 {
 	char buf[201];
 	int ret;
 
-	ret = fscanf(in, " instr %lld:", &addr);
+	ret = fscanf(in, " instr %d:", &name);
 	if (ret == EOF)
 		return;
 	fscanf(in, "%200s", buf);
@@ -163,11 +190,15 @@ Instruction::Instruction (FILE *in):
 		fscanf(in, "%200s", buf);
 		oper[1] = Operand(buf);
 	}
+	if (op == Opcode::CALL) {
+		assert(oper[0].type == Operand::LABEL);
+		oper[0].type = Operand::FUNC;
+	}
 }
 
 void Instruction::icode (FILE *out) const
 {
-	fprintf(out, "instr %lld: %s", addr, op.name());
+	fprintf(out, "instr %d: %s", name, op.name());
 	if (oper[0]) {
 		fprintf(out, " ");
 		oper[0].icode(out);
@@ -181,41 +212,34 @@ void Instruction::icode (FILE *out) const
 
 void Instruction::ccode (FILE *out) const
 {
-	if (op == Opcode::ENTER) {
-		fprintf(out, "void instr_%lld() {\n", addr);
-	} else if (op == Opcode::ENTRYPC) {
-		fprintf(out, "void instr_%lld();\nvoid (*entry)() = instr_%lld", addr + 1, addr + 1);
-	} else {
-		fprintf(out, "instr_%lld: ", addr);
-	}
-
+	fprintf(out, "instr_%d: ", name);
 	switch(op) {
 	case Opcode::ADD:
-		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " + "); oper[1].ccode(out);
+		fprintf(out, "r[%d] = ", name); oper[0].ccode(out); fprintf(out, " + "); oper[1].ccode(out);
 		break;
 	case Opcode::SUB:
-		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " - "); oper[1].ccode(out);
+		fprintf(out, "r[%d] = ", name); oper[0].ccode(out); fprintf(out, " - "); oper[1].ccode(out);
 		break;
 	case Opcode::MUL:
-		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " * "); oper[1].ccode(out);
+		fprintf(out, "r[%d] = ", name); oper[0].ccode(out); fprintf(out, " * "); oper[1].ccode(out);
 		break;
 	case Opcode::DIV:
-		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " / "); oper[1].ccode(out);
+		fprintf(out, "r[%d] = ", name); oper[0].ccode(out); fprintf(out, " / "); oper[1].ccode(out);
 		break;
 	case Opcode::MOD:
-		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " %% "); oper[1].ccode(out);
+		fprintf(out, "r[%d] = ", name); oper[0].ccode(out); fprintf(out, " %% "); oper[1].ccode(out);
 		break;
 	case Opcode::NEG:
-		fprintf(out, "r[%lld] = ", addr); fprintf(out, "- "); oper[0].ccode(out);
+		fprintf(out, "r[%d] = ", name); fprintf(out, "- "); oper[0].ccode(out);
 		break;
 	case Opcode::CMPEQ:
-		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " == "); oper[1].ccode(out);
+		fprintf(out, "r[%d] = ", name); oper[0].ccode(out); fprintf(out, " == "); oper[1].ccode(out);
 		break;
 	case Opcode::CMPLE:
-		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " <= "); oper[1].ccode(out);
+		fprintf(out, "r[%d] = ", name); oper[0].ccode(out); fprintf(out, " <= "); oper[1].ccode(out);
 		break;
 	case Opcode::CMPLT:
-		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " < "); oper[1].ccode(out);
+		fprintf(out, "r[%d] = ", name); oper[0].ccode(out); fprintf(out, " < "); oper[1].ccode(out);
 		break;
 	case Opcode::BR:
 		fprintf(out, "goto "); oper[0].ccode(out);
@@ -227,19 +251,19 @@ void Instruction::ccode (FILE *out) const
 		fprintf(out, "if ("); oper[0].ccode(out); fprintf(out, "!= 0) goto "); oper[1].ccode(out);
 		break;
 	case Opcode::CALL:
-		fprintf(out, "SP -= 8; MEM(SP) = %lld + 1; ", addr); oper[0].ccode(out); fprintf(out, "()");
+		fprintf(out, "SP -= 8; MEM(SP) = %d + 1; ", name); oper[0].ccode(out); fprintf(out, "()");
 		break;
 	case Opcode::LOAD:
-		fprintf(out, "r[%lld] = MEM(", addr); oper[0].ccode(out); fprintf(out, ")");
+		fprintf(out, "r[%d] = MEM(", name); oper[0].ccode(out); fprintf(out, ")");
 		break;
 	case Opcode::STORE:
 		fprintf(out, "MEM("); oper[1].ccode(out); fprintf(out, ") = "); oper[0].ccode(out);
 		break;
 	case Opcode::MOVE:
-		fprintf(out, "r[%lld] = ", addr); oper[1].ccode(out); fprintf(out, " = "); oper[0].ccode(out);
+		fprintf(out, "r[%d] = ", name); oper[1].ccode(out); fprintf(out, " = "); oper[0].ccode(out);
 		break;
 	case Opcode::READ:
-		fprintf(out, "ReadLong(r[%lld])", addr);
+		fprintf(out, "ReadLong(r[%d])", name);
 		break;
 	case Opcode::WRITE:
 		fprintf(out, "WriteLong("); oper[0].ccode(out); fprintf(out, ")");
@@ -257,38 +281,40 @@ void Instruction::ccode (FILE *out) const
 		fprintf(out, "SP = FP + 16 + "); oper[0].ccode(out); fprintf(out, "; FP = MEM(FP)");
 		break;
 	}
-
 	fprintf(out, ";\n");
-	if (op == Opcode::RET) {
-		fprintf(out, "}\n");
-	}
 }
 
-int Instruction::get_branch_target () const
+int Instruction::get_branch_oper () const
 {
 	if (op.type == Opcode::BR)
-		return oper[0].value;
-	if (op.type == Opcode::BLBC || op.type == Opcode::BLBS)
-		return oper[1].value;
-	if (op.type == Opcode::RET)
 		return 0;
+	if (op.type == Opcode::BLBC || op.type == Opcode::BLBS)
+		return 1;
 	return -1;
 }
 
-void Instruction::set_br_addr(long long addr)
+Block *Instruction::get_branch_target () const
 {
-    if (op.type == Opcode::BR)
-        oper[0].value = addr;
-    else if (op.type == Opcode::BLBC || op.type == Opcode::BLBS)
-        oper[1].value = addr;
+	if (op.type == Opcode::BR)
+		return oper[0].jump;
+	if (op.type == Opcode::BLBC || op.type == Opcode::BLBS)
+		return oper[1].jump;
+	return NULL;
 }
 
-int Instruction::get_next_instr() const
+void Instruction::set_branch(Block *block)
+{
+    if (op.type == Opcode::BR)
+        oper[0].jump = block;
+    else if (op.type == Opcode::BLBC || op.type == Opcode::BLBS)
+        oper[1].jump = block;
+}
+
+bool Instruction::falldown() const
 {
 	if (op == Opcode::BR || op == Opcode::RET)
-		return -1;
-	else
-		return addr + 1;
+		return false;
+	return true;
 }
 
 bool Instruction::isconst() const {
@@ -313,25 +339,25 @@ long long Instruction::constvalue() const {
 	if (!isconst()) return 0;
 	switch(op) {
 	case Opcode::ADD:
-		return oper[0].value + oper[1].value;
+		return oper[0].value_const + oper[1].value_const;
 	case Opcode::SUB:
-		return oper[0].value - oper[1].value;
+		return oper[0].value_const - oper[1].value_const;
 	case Opcode::MUL:
-		return oper[0].value * oper[1].value;
+		return oper[0].value_const * oper[1].value_const;
 	case Opcode::DIV:
-		return oper[0].value / oper[1].value;
+		return oper[0].value_const / oper[1].value_const;
 	case Opcode::MOD:
-		return oper[0].value % oper[1].value;
+		return oper[0].value_const % oper[1].value_const;
 	case Opcode::CMPEQ:
-		return oper[0].value == oper[1].value;
+		return oper[0].value_const == oper[1].value_const;
 	case Opcode::CMPLE:
-		return oper[0].value <= oper[1].value;
+		return oper[0].value_const <= oper[1].value_const;
 	case Opcode::CMPLT:
-		return oper[0].value < oper[1].value;
+		return oper[0].value_const < oper[1].value_const;
 	case Opcode::NEG:
-		return -oper[0].value;
+		return -oper[0].value_const;
 	case Opcode::MOVE:
-		return oper[0].value;
+		return oper[0].value_const;
 	}
 	return 0;
 }
@@ -407,37 +433,63 @@ void Instruction::erase()
 Program::Program (FILE *in):
 	Program()
 {
+	std::vector<Instruction> instr;
+
 	while (!feof(in)) {
 		instr.push_back(Instruction(in));
 	}
 	if (!instr.back())
 		instr.pop_back();
+
+	for (auto p = instr.begin(), enter = instr.end(); p != instr.end(); ++p) {
+		if (p->op == Opcode::ENTER) {
+			assert(enter == instr.end());
+			enter = p;
+		} else if (p->op == Opcode::RET) {
+			assert(enter != instr.end());
+			Function *f = new Function(this, enter, p+1);
+			funcs.push_back(f);
+			if (enter != instr.begin() && (--enter)->op == Opcode::ENTRYPC) {
+				assert(main == NULL);
+				main = f;
+			}
+			enter = instr.end();
+		}
+	}
+	assert(main != NULL);
 }
 
-void Program::icode (FILE *out) const
+void Program::rename()
 {
-    ssa_mode = false;
-    fputs("instr 1: nop\n", out);
+	int i = 2;
+	for (Function *func: funcs) {
+		if (func == main)
+			++i;
+		i = func->rename(i);
+	}
+}
 
-    for (Function* func : funcs) {
-        if (func->is_main)
-            fprintf(out, "instr %lld: entrypc\n", func->entry->addr() - 1);
+void Program::icode (FILE *out)
+{
+	rename();
+	ssa_mode = false;
+	fprintf(out, "instr 1: nop\n");
+	int i;
 
-        for (Block* block = func->entry; block != nullptr; block = block->seq_next2) {
-            block->instr.back().set_br_addr(block->br_next->addr());
-            for (int i = 0; i < block->instr.size() - 1; ++i)
-                if (block->instr[i].op != Opcode::NOP)
-                    block->instr[i].icode(out);
-        }
-    }
+	for (Function* func : funcs) {
+		if (func == main)
+			fprintf(out, "instr %d: entrypc\n", func->entry->name - 1);
 
-    fprintf(out, "instr %d: nop\n", (int)instr.size() - 1);
+		i = func->icode(out);
+	}
+
+	fprintf(out, "instr %d: nop\n", i);
 }
 
 
-void Program::ccode (FILE *out) const
+void Program::ccode (FILE *out)
 {
-
+	rename();
 	fprintf(out, "%s",
 	"#include <stdio.h>\n"
 	"#define WriteLine() printf(\"\\n\");\n"
@@ -454,38 +506,12 @@ void Program::ccode (FILE *out) const
 	"long FP = 65536;\n"
 	"\n"
 	);
+	fprintf(out, "void func_%d();\nvoid (*entry)() = func_%d;\n\n", main->name, main->name);
 
-
-	bool in_function = false;
-	for (auto p = ++instr.begin(); p != instr.end(); ++p) {
-		if (p->op == Opcode::ENTER) {
-			in_function = true;
-		} else if (p->op == Opcode::RET) {
-			in_function = false;
-		}
-		if (in_function || p->op != Opcode::NOP) {
-			p->ccode(out);
-		}
-	}
+	for (Function* func : funcs)
+		func->ccode(out);
 
 	fprintf(out,"void main()\n{\n\t(*entry)();\n}\n");
-}
-
-void Program::find_functions()
-{
-    int enter = -1;
-
-    for (int i = 1; i < instr.size(); ++i) {
-        if (instr[i].op == Opcode::ENTER) {
-            assert(enter == -1);
-            enter = i;
-
-        } else if (instr[i].op == Opcode::RET) {
-            assert(enter > 0);
-            funcs.push_back(new Function(this, enter, i));
-            enter = -1;
-        }
-    }
 }
 
 void Program::build_domtree()
@@ -509,7 +535,7 @@ void Program::dead_eliminate()
 void Operand::to_const(long long val)
 {
     type = Operand::CONST;
-    value = val;
+    value_const = val;
     tag.clear();
     ssa_idx = -1;
 }
@@ -520,55 +546,143 @@ Program::~Program()
         delete func;
 }
 
-Function::Function(Program* prog, int a, int b)
-    : prog(prog), enter(a), exit(b)
+Function::Function(Program *parent, std::vector<Instruction>::iterator begin, std::vector<Instruction>::iterator end)
+    : prog(parent)
 {
-    assert(prog->instr[enter].op == Opcode::ENTER);
-    frame_size = prog->instr[enter].oper[0].value / 8;
-    arg_count = prog->instr[exit].oper[0].value / 8;
-    is_main = prog->instr[enter - 1].op == Opcode::ENTRYPC;
+	auto exit = end;
+	--exit;
+	assert(begin->op == Opcode::ENTER);
+	assert(exit->op == Opcode::RET);
+	frame_size = begin->oper[0]._value/ 8;
+	arg_count = exit->oper[0]._value/ 8;
 
-    std::set<int> bounds;  // boundaries of blocks
+	std::map<int, int> addr_instr;
+	std::vector<Instruction*> instr;
+	for (auto p = begin; p != end; ++p) {
+		assert(addr_instr.count(p->name) == 0);
+		addr_instr[p->name] = instr.size();
+		instr.push_back(new Instruction(*p));
+	}
 
-    for (int i = enter; i <= exit; ++i) {
-        int br = prog->instr[i].get_branch_target();
-        if (br != -1 || prog->instr[i].op == Opcode::CALL)
-            bounds.insert(i + 1);
-        if (br > 0)
-            bounds.insert(br);
-    }
+	std::set<int> bounds;  // boundaries of blocks
+	for (int i = 0; i < (int)instr.size(); ++i) {
+		int o = instr[i]->get_branch_oper();
+		if (o != -1 || instr[i]->op == Opcode::CALL)
+			bounds.insert(i + 1);
+		if (o != -1)
+			bounds.insert(addr_instr[instr[i]->oper[o]._value]);
+	}
+	bounds.insert(instr.size());
 
-    int begin = enter;
-    for (int end : bounds) {
-        auto it = prog->instr.cbegin();
-        blocks[begin] = new Block(this, std::vector<Instruction>(it + begin, it + end));
-        begin = end;
-    }
-    entry = blocks[enter];
+	std::map<int, Block*> addr_blocks;
+	int st = 0;
+	for (int ed : bounds) {
+		auto it = instr.begin();
+		Block *b = new Block(this, it + st, it + ed);
+		addr_blocks[b->name] = b;
+		blocks.push_back(b);
+		st = ed;
+	}
+	entry = addr_blocks[instr[0]->name];
+	name = entry->name;
 
-    begin = enter;
-    for (int end : bounds) {
-        Block* b = blocks[begin];
+	std::map<int, Localvar*> vars;
+	for (Instruction *i: instr) for (int o = 0; o < 2; ++o) {
+		Operand &oper = i->oper[o];
+		switch (oper) {
+		case Operand::CONST:
+			oper.value_const = oper._value;
+			break;
+		case Operand::LOCAL:
+			if (vars.count(oper._value) == 0) {
+				Localvar *var = new Localvar(oper.tag, oper._value);
+				vars[oper._value] = var;
+				localvars.push_back(var);
+				oper.var = var;
+				oper.tag.clear();
+			} else {
+				assert(oper.tag == vars[oper._value]->name);
+				oper.var = vars[oper._value];
+				oper.tag.clear();
+			}
+			break;
+		case Operand::REG:
+			oper.reg = instr[addr_instr[oper._value]];
+			break;
+		case Operand::LABEL:
+			oper.jump = addr_blocks[oper._value];
+			break;
+		case Operand::FUNC:
+			oper.value_const = oper._value;
+			break;
+		}
+	}
 
-        Opcode::Type op = b->instr.back().op;
-        b->seq_next = (op != Opcode::BR && op != Opcode::RET) ? blocks[end] : nullptr;
-	if (b->seq_next)
-		b->seq_next->prevs.push_back(b);
-        b->seq_next2 = (op != Opcode::RET) ? blocks[end] : nullptr;
+	st = 0;
+	for (int ed : bounds) {
+		Block *b = addr_blocks[instr[st]->name];
 
-        int br = b->instr.back().get_branch_target();
-        b->br_next = (br > 0) ? blocks[br] : nullptr;
-	if (b->br_next && b->br_next != b->seq_next)
-		b->br_next->prevs.push_back(b);
+		Instruction *i = b->instr.back();
+		b->seq_next = i->falldown() ? addr_blocks[instr[ed]->name] : nullptr;
+		if (b->seq_next)
+			b->seq_next->prevs.push_back(b);
+		b->order_next = (i->op != Opcode::RET) ? addr_blocks[instr[ed]->name] : nullptr;
 
-        begin = end;
-    }
+		b->br_next = b->instr.back()->get_branch_target();
+		if (b->br_next) {
+			assert(b->br_next != b->seq_next);
+			b->br_next->prevs.push_back(b);
+		}
+
+		st = ed;
+	}
 }
 
 Function::~Function()
 {
-    for (const auto& iter : blocks)
-        delete iter.second;
+    for (auto iter : blocks)
+        delete iter;
+    for (auto iter : localvars)
+        delete iter;
+}
+
+int Function::rename(int i)
+{
+	for (Block *p = entry; p != NULL; p = p->order_next) {
+		assert(!p->instr.empty());
+		for (Instruction *ins: p->instr) {
+			ins->name = i++;
+		}
+		p->name = p->instr.front()->name;
+	}
+	// Function name not change
+	//name = entry->name;
+	return i;
+}
+
+void Function::ccode(FILE *out) const
+{
+	fprintf(out, "void func_%d() {\n", name);
+
+	for (Block *p = entry; p != NULL; p = p->order_next) {
+		assert(!p->instr.empty());
+		for (Instruction *ins: p->instr)
+			ins->ccode(out);
+	}
+
+	fprintf(out, "}\n");
+}
+
+int Function::icode(FILE *out) const
+{
+	int i;
+	for (Block *p = entry; p != NULL; p = p->order_next) {
+		assert(!p->instr.empty());
+		for (Instruction *ins: p->instr)
+			ins->icode(out);
+		i = p->instr.back()->name;
+	}
+	return i+1;
 }
 
 void Function::build_domtree()
@@ -580,8 +694,7 @@ void Function::build_domtree()
 	bool change;
 	do {
 		change = false;
-		for (auto pb: blocks) {
-			Block *b = pb.second;
+		for (Block *b: blocks) {
 			if (dominators.find(b) == dominators.end()) {
 				bool found = false;
 				for (Block *p: b->prevs) {
@@ -616,16 +729,14 @@ void Function::build_domtree()
 		}
 	} while(change);
 	std::multimap<Block*, Block*> backedge;
-	for (auto pb: blocks) {
-		Block *b = pb.second;
+	for (Block *b: blocks) {
 		blockset &bs = dominators.find(b)->second;
 		if (b->seq_next != NULL && bs.find(b->seq_next) != bs.end())
 			backedge.insert(std::make_pair(b->seq_next, b));
 		if (b->br_next != NULL && bs.find(b->br_next) != bs.end())
 			backedge.insert(std::make_pair(b->br_next, b));
 	}
-	for (auto pb: blocks) {
-		Block *b = pb.second;
+	for (Block *b: blocks) {
 		auto st = backedge.lower_bound(b), ed = backedge.upper_bound(b);
 		if (st != ed) {
 			loops[b] = blockset();
@@ -645,13 +756,11 @@ void Function::build_domtree()
 			}
 		}
 	}
-	for (auto pb: blocks) {
-		Block *b = pb.second;
+	for (Block *b: blocks) {
 		b->idom = NULL;
 		b->domc.clear();
 	}
-	for (auto pb: blocks) {
-		Block *b = pb.second;
+	for (Block *b: blocks) {
 		blockset &bs = dominators.find(b)->second;
 		for (Block *p: bs) {
 			blockset &ps = dominators.find(p)->second;
@@ -668,33 +777,29 @@ void Function::build_domtree()
 
 void Function::constant_propagate()
 {
-	typedef std::set<std::pair<int, int> > iset; // Set of variable definitions
+	// uintptr-t -> Instruction*
+	typedef std::set<std::pair<Localvar*, uintptr_t> > iset; // Set of variable definitions
 	int propa_count = 0;
-	std::vector<Instruction> &instr = prog->instr;
 	std::map<Block*, iset> rd; // Reaching Definition IN
-	for (auto pb: blocks) {
-		Block *b = pb.second;
+	for (Block *b: blocks) {
 		rd[b] = iset();
 	}
-	for (int i = 0; i < arg_count; ++i)
+	for (Localvar *v: localvars) if (v->offset > 0)
 		// Insert function agruments
 		// Instruction after enter
-		rd[blocks[enter]].insert(std::make_pair((i+2)*8, enter));
+		rd[entry].insert(std::make_pair(v, (uintptr_t)entry->instr.front()));
 	bool change;
 	do {
 		change = false;
-		for (auto pb: blocks) {
-			Block *b = pb.second;
+		for (Block *b: blocks) {
 			iset cur = rd[b]; // Copy
-			for (int j = 0; j < b->instr.size(); ++j) {
-				int i = b->instr[j].addr; // Instruction address;
-				Instruction &ins = instr[i]; // Instruction in Program
-				if (ins.op == Opcode::MOVE && ins.oper[1] == Operand::LOCAL) {
-					int def = ins.oper[1].value;
-					auto vst = cur.lower_bound(std::make_pair(def, INT_MIN));
-					auto ved = cur.lower_bound(std::make_pair(def, INT_MAX));
+			for (Instruction *i: b->instr) {
+				if (i->op == Opcode::MOVE && i->oper[1] == Operand::LOCAL) {
+					Localvar *def = i->oper[1].var;
+					auto vst = cur.lower_bound(std::make_pair(def, 0));
+					auto ved = cur.lower_bound(std::make_pair(def, UINTPTR_MAX));
 					cur.erase(vst, ved);
-					cur.insert(std::make_pair(def, i));
+					cur.insert(std::make_pair(def, (uintptr_t)i));
 				}
 			}
 			for (int t = 0; t < 2; ++t) {
@@ -711,26 +816,23 @@ void Function::constant_propagate()
 	} while (change);
 	do {
 		change = false;
-		for (auto pb: blocks) {
-			Block *b = pb.second;
+		for (Block *b: blocks) {
 			iset cur = rd[b]; // Copy
-			for (int j = 0; j < b->instr.size(); ++j) {
-				int i = b->instr[j].addr; // Instruction address;
-				Instruction &ins = instr[i]; // Instruction in Program
-				for (int o = 0; o < 2; ++o) if (ins.isrightvalue(o)) switch(ins.oper[o].type) {
+			for (Instruction *i: b->instr) {
+				for (int o = 0; o < 2; ++o) if (i->isrightvalue(o)) switch(i->oper[o].type) {
 				case Operand::LOCAL: {
-					int var = ins.oper[o].value;
-					auto vst = cur.lower_bound(std::make_pair(var, INT_MIN));
-					auto ved = cur.lower_bound(std::make_pair(var, INT_MAX));
+					Localvar *var = i->oper[o].var;
+					auto vst = cur.lower_bound(std::make_pair(var, 0));
+					auto ved = cur.lower_bound(std::make_pair(var, UINTPTR_MAX));
 					bool flag = true;
 					long long value = 0;
 					for (auto v = vst; v != ved; ++v) {
-						Instruction &ins2 = instr[v->second];
-						assert(ins2.op == Opcode::MOVE || ins2.op == Opcode::ENTER);
-						if (ins2.op == Opcode::MOVE && ins2.oper[0].type == Operand::CONST) {
+						Instruction *ins2 = (Instruction *)v->second;
+						assert(ins2->op == Opcode::MOVE || ins2->op == Opcode::ENTER);
+						if (ins2->op == Opcode::MOVE && ins2->oper[0].type == Operand::CONST) {
 							if (v == vst) {
-								value = ins2.oper[0].value;
-							} else if (value != ins2.oper[0].value) {
+								value = ins2->oper[0].value_const;
+							} else if (value != ins2->oper[0].value_const) {
 								flag = false;
 							}
 						} else {
@@ -740,51 +842,45 @@ void Function::constant_propagate()
 							break;
 					}
 					if (flag) {
-						ins.oper[o] = Operand();
-						ins.oper[o].type = Operand::CONST;
-						ins.oper[o].value = value;
+						i->oper[o].to_const(value);
 						change = true;
 						propa_count++;
 					}
 					break;
 				}
-				case Operand::REG:{
-					Instruction &ins2 = instr[ins.oper[o].value];
-					if (ins2.isconst()) {
-						ins.oper[o] = Operand();
-						ins.oper[o].type = Operand::CONST;
-						ins.oper[o].value = ins2.constvalue();
+				case Operand::REG: {
+					Instruction *ins2 = i->oper[o].reg;
+					if (ins2->isconst()) {
+						i->oper[o].to_const(ins2->constvalue());
 						change = true;
 						propa_count++;
 					}
 				}
 				}
-				if (ins.op == Opcode::MOVE && ins.oper[1] == Operand::LOCAL) {
-					int def = ins.oper[1].value;
-					auto vst = cur.lower_bound(std::make_pair(def, INT_MIN));
-					auto ved = cur.lower_bound(std::make_pair(def, INT_MAX));
+				if (i->op == Opcode::MOVE && i->oper[1] == Operand::LOCAL) {
+					Localvar *def = i->oper[1].var;
+					auto vst = cur.lower_bound(std::make_pair(def, 0));
+					auto ved = cur.lower_bound(std::make_pair(def, UINTPTR_MAX));
 					cur.erase(vst, ved);
-					cur.insert(std::make_pair(def, i));
+					cur.insert(std::make_pair(def, (uintptr_t)i));
 				}
 			}
 		}
 	} while(change);
 	if (output_report) {
-		printf("Function: %d\n", enter);
+		printf("Function: %d\n", name);
 		printf("Number of constants propagated: %d\n", propa_count);
 	}
 }
 
 void Function::dead_eliminate()
 {
-	typedef std::set<int> iset; // Set of variable definitions
+	typedef std::set<Localvar*> iset; // Set of variable definitions
 	int elimin_count_in = 0, elimin_count_out = 0;
-	std::vector<Instruction> &instr = prog->instr;
 	std::map<Block*, iset> lv; // Live Variables OUT
-	std::set<int> lvreg; // Live Temporary Registers
+	std::set<Instruction*> lvreg; // Live Temporary Registers
 	std::set<Block*> inloop; // Block in Loops
-	for (auto pb: blocks) {
-		Block *b = pb.second;
+	for (Block *b: blocks) {
 		lv[b] = iset();
 	}
 	for (auto s: loops) for (Block *b: s.second) {
@@ -794,31 +890,30 @@ void Function::dead_eliminate()
 	do {
 		change = false;
 		for (auto ib = blocks.rbegin(); ib != blocks.rend(); ++ib) {
-			Block *b = ib->second;
+			Block *b = *ib;
 			iset cur = lv[b]; // Copy
-			for (int j = (int)b->instr.size() - 1; j >= 0; --j) {
-				int i = b->instr[j].addr; // Instruction address;
-				Instruction &ins = instr[i]; // Instruction in Program
+			for (auto j = b->instr.rbegin(); j != b->instr.rend(); ++j) {
+				Instruction *i = *j;
 				bool live = false;
-				if (!ins.eliminable() || lvreg.find(i) != lvreg.end()) {
+				if (!i->eliminable() || lvreg.find(i) != lvreg.end()) {
 					live = true;
 				}
-				if (ins.op == Opcode::MOVE && ins.oper[1] == Operand::LOCAL) {
-					int def = ins.oper[1].value;
+				if (i->op == Opcode::MOVE && i->oper[1] == Operand::LOCAL) {
+					Localvar *def = i->oper[1].var;
 					if (cur.find(def) != cur.end()) {
 						cur.erase(def);
 						live = true;
 					}
 				}
-				if (live) for (int o = 0; o < 2; ++o) if (ins.isrightvalue(o)) {
-					switch(ins.oper[o]) {
+				if (live) for (int o = 0; o < 2; ++o) if (i->isrightvalue(o)) {
+					switch(i->oper[o]) {
 					case Operand::LOCAL: {
-						int use = ins.oper[o].value;
+						Localvar *use = i->oper[o].var;
 						cur.insert(use);
 						break;
 					}
 					case Operand::REG: {
-						int reg = ins.oper[o].value;
+						Instruction *reg = i->oper[o].reg;
 						if (lvreg.find(reg) == lvreg.end()) {
 							lvreg.insert(reg);
 							change = true;
@@ -838,28 +933,27 @@ void Function::dead_eliminate()
 		}
 	} while (change);
 	for (auto ib = blocks.rbegin(); ib != blocks.rend(); ++ib) {
-		Block *b = ib->second;
+		Block *b = *ib;
 		iset cur = lv[b]; // Copy
 		bool inl = (inloop.find(b) != inloop.end());
-		for (int j = (int)b->instr.size() - 1; j >= 0; --j) {
-			int i = b->instr[j].addr; // Instruction address;
-			Instruction &ins = instr[i]; // Instruction in Program
+		for (auto j = b->instr.rbegin(); j != b->instr.rend(); ++j) {
+			Instruction *i = *j;
 			bool live = false;
-			if (!ins.eliminable() || lvreg.find(i) != lvreg.end()) {
+			if (!i->eliminable() || lvreg.find(i) != lvreg.end()) {
 				live = true;
 			}
-			if (ins.op == Opcode::MOVE && ins.oper[1] == Operand::LOCAL) {
-				int def = ins.oper[1].value;
+			if (i->op == Opcode::MOVE && i->oper[1] == Operand::LOCAL) {
+				Localvar *def = i->oper[1].var;
 				if (cur.find(def) != cur.end()) {
 					cur.erase(def);
 					live = true;
 				}
 			}
 			if (live) {
-				for (int o = 0; o < 2; ++o) if (ins.isrightvalue(o)) {
-					switch(ins.oper[o]) {
+				for (int o = 0; o < 2; ++o) if (i->isrightvalue(o)) {
+					switch(i->oper[o]) {
 					case Operand::LOCAL: {
-						int use = ins.oper[o].value;
+						Localvar *use = i->oper[o].var;
 						cur.insert(use);
 						break;
 					}
@@ -867,10 +961,10 @@ void Function::dead_eliminate()
 				}
 			} else {
 				/* Eliminate */
-				long long back_addr = ins.addr;
-				ins = Instruction();
-				ins.op.type = Opcode::NOP;
-				ins.addr = back_addr;
+				int name = i->name;
+				*i = Instruction();
+				i->op.type = Opcode::NOP;
+				i->name = name;
 				if (inl)
 					++elimin_count_in;
 				else
@@ -879,14 +973,13 @@ void Function::dead_eliminate()
 		}
 	}
 	if (output_report) {
-		fprintf(stderr, "Function: %d\n", enter);
+		fprintf(stderr, "Function: %d\n", name);
 		fprintf(stderr, "Number of statements eliminated in SCR: %d\n", elimin_count_in);
 		fprintf(stderr, "Number of statements eliminated not in SCR: %d\n", elimin_count_out);
 	}
 }
 
-Block::Block(Function* func, std::vector<Instruction> instr_)
-    : func(func)
-{
-    instr.swap(instr_);
+Block::~Block() {
+    for (auto iter : instr)
+        delete iter;
 }

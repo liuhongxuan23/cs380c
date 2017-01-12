@@ -11,6 +11,11 @@
 
 extern bool output_report;
 
+struct Instruction;
+struct Block;
+struct Function;
+struct Localvar;
+
 struct Opcode {
 	enum Type {
 		UNKNOWN = 0,
@@ -41,12 +46,18 @@ struct Opcode {
 
 struct Operand {
 	enum Type {
-		UNKNOWN = 0, GP, FP, CONST, LOCAL, REG, LABEL,
+		UNKNOWN = 0, GP, FP, CONST, LOCAL, REG, LABEL, FUNC
 	};
 	Type type;
-	long long value;
+	union {
+		long long _value;
+		long long value_const;
+		Instruction *reg;
+		Block *jump;
+		Localvar *var;
+	};
 	std::string tag;
-	Operand (): type(UNKNOWN), value(0), tag() {}
+	Operand (): type(UNKNOWN), _value(0), tag() {}
 	Operand (const char *str);
 	operator Type() const { return type; }
 	void icode (FILE *out) const;
@@ -63,17 +74,18 @@ struct Operand {
 };
 
 struct Instruction {
-	long long addr;
+	int name = -1;
 	Opcode op;
 	Operand oper[2];
-	Instruction (): addr(-1) {}
+	Instruction () {}
 	Instruction (FILE *in);
 	void icode (FILE *out) const;
 	void ccode (FILE *out) const;
 	operator bool() const { return bool(op); }
-        int get_branch_target () const;
-	int get_next_instr() const;
-        void set_br_addr(long long addr);
+        int get_branch_oper () const;
+        Block *get_branch_target () const;
+	bool falldown() const;
+        void set_branch(Block *block);
 	bool isconst() const;
 	long long constvalue() const;
 	bool isrightvalue(int o) const;
@@ -102,13 +114,16 @@ struct RenameStack {
 
 class Block {
 public:
-    Block(Function* func, std::vector<Instruction> instr);
+    Block(Function* func, std::vector<Instruction*>::iterator begin, std::vector<Instruction*>::iterator end)
+        : func(func), instr(begin, end), name((*begin)->name) {}
+    ~Block();
 
     Function* func;
+    int name;
     Block* seq_next = nullptr;
     Block* br_next = nullptr;
-    Block* seq_next2 = nullptr;
-    std::vector<Instruction> instr;
+    Block* order_next = nullptr;
+    std::list<Instruction*> instr;
     std::vector<Block*> prevs;
     std::vector<Block*> prevs2;
     Block *idom = NULL;
@@ -117,11 +132,8 @@ public:
     std::vector<Instruction> insert;
 
     long long addr() const {
-        int i = 0;
-        while (i < instr.size() && instr[i].op == Opcode::NOP) i++;
-        if (i < instr.size()) return instr[i].addr;
-        assert(seq_next == seq_next2);
-        return seq_next2->addr();
+	/* TODO */
+	return name;
     }
 
     // SSA
@@ -135,18 +147,28 @@ public:
     void ssa_rename_var(std::map<int, RenameStack>& stack);
 };
 
+struct Localvar {
+	std::string name;
+	long long offset;
+	Localvar () {}
+	Localvar (std::string n, long long o): name(n), offset(o) {}
+};
+
 class Function {
 public:
-    Function(Program* parent, int a, int b);
+    Function(Program* parent, std::vector<Instruction>::iterator begin, std::vector<Instruction>::iterator end);
     ~Function();
+    int rename (int i);
+    int icode (FILE *out) const;
+    void ccode (FILE *out) const;
 
     Program* prog;
-    int enter;
-    int exit;
+    int name;
     int frame_size;
     int arg_count;
     bool is_main;
-    std::map<int, Block*> blocks;
+    std::vector<Localvar*> localvars;
+    std::vector<Block*> blocks;
     std::map<Block*, std::set<Block*> > loops;
     Block* entry;
 
@@ -163,14 +185,14 @@ public:
 };
 
 struct Program {
-	std::vector<Instruction> instr;
         std::vector<Function*> funcs;
-        Program () { instr.push_back(Instruction()); }
+	Function *main = NULL;
+        Program () {}
 	Program (FILE *in);
         ~Program ();
-	void icode (FILE *out) const;
-	void ccode (FILE *out) const;
-        void find_functions();
+	void rename ();
+	void icode (FILE *out);
+	void ccode (FILE *out);
 	void build_domtree();
 	void constant_propagate();
 	void dead_eliminate();

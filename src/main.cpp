@@ -38,60 +38,56 @@ const char *backendname[] = {
 };
 
 void print_cfg(Program *prog) {
-	for (auto func: prog->funcs) {
-		printf("Function: %lld\n", func->blocks.cbegin()->second->instr[0].addr);
+	for (Function *func: prog->funcs) {
+		printf("Function: %d\n", func->name);
 
 		printf("Basic blocks:");
-		for (auto iter : func->blocks)
-			printf(" %lld", iter.second->instr[0].addr);
+		for (Block *b = func->entry; b != NULL; b = b->order_next)
+			printf(" %d", b->name);
 
 		printf("\nCFG:\n");
-		for (auto iter : func->blocks) {
-			Block* b = iter.second;
-			printf("%lld ->", b->instr[0].addr);
+		for (Block *b = func->entry; b != NULL; b = b->order_next) {
+			printf("%d ->", b->name);
 			if (b->seq_next != nullptr)
-				printf(" %lld", b->seq_next->instr[0].addr);
+				printf(" %d", b->seq_next->name);
 			if (b->br_next != nullptr)
-				printf(" %lld", b->br_next->instr[0].addr);
+				printf(" %d", b->br_next->name);
 			putchar('\n');
 		}
 	}
 }
 
 void print_dom(Program *prog) {
-	for (auto func: prog->funcs) {
-		printf("Function: %lld\n", func->blocks.cbegin()->second->instr[0].addr);
+	for (Function *func: prog->funcs) {
+		printf("Function: %d\n", func->name);
 
 		printf("Basic blocks:");
-		for (auto iter : func->blocks)
-			printf(" %lld", iter.second->instr[0].addr);
+		for (Block *b = func->entry; b != NULL; b = b->order_next)
+			printf(" %d", b->name);
 
 		printf("\nCFG:\n");
-		for (auto iter : func->blocks) {
-			Block* b = iter.second;
-			printf("%lld ->", b->instr[0].addr);
+		for (Block *b = func->entry; b != NULL; b = b->order_next) {
+			printf("%d ->", b->name);
 			if (b->seq_next != nullptr)
-				printf(" %lld", b->seq_next->instr[0].addr);
+				printf(" %d", b->seq_next->name);
 			if (b->br_next != nullptr)
-				printf(" %lld", b->br_next->instr[0].addr);
+				printf(" %d", b->br_next->name);
 			putchar('\n');
 		}
 
 		printf("\nDom Tree:\n");
-		for (auto iter : func->blocks) {
-			Block* b = iter.second;
-			printf("%lld ->", b->instr[0].addr);
+		for (Block *b = func->entry; b != NULL; b = b->order_next) {
+			printf("%d ->", b->name);
 			for (Block *c: b->domc)
-				printf(" %lld", c->instr[0].addr);
+				printf(" %d", c->name);
 			putchar('\n');
 		}
 
 		printf("\nLoops:\n");
-		for (auto iter : func->loops) {
-			Block *b = iter.first;
-			printf("%lld ->", b->instr[0].addr);
-			for (Block *c: iter.second) {
-				printf(" %lld", c->instr[0].addr);
+		for (Block *b = func->entry; b != NULL; b = b->order_next) if (func->loops.count(b) > 0) {
+			auto s = func->loops[b];
+			for (Block *c: s) {
+				printf(" %d", c->name);
 			}
 			putchar('\n');
 		}
@@ -163,7 +159,6 @@ int main(int argc, char **argv) {
 	if (b == REP) output_report = true;
 
 	Program prog(stdin);
-	prog.find_functions();
 	prog.build_domtree();
 
         bool ssa_on = false;
@@ -185,6 +180,7 @@ int main(int argc, char **argv) {
         case LICM:
                 break;
 	}
+	prog.rename();
 	switch(b) {
 	case THREEADDR:
 		prog.icode(stdout);
