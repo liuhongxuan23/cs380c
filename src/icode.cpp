@@ -617,14 +617,29 @@ void Function::constant_propagate()
 					int var = ins.oper[o].value;
 					auto vst = cur.lower_bound(std::make_pair(var, INT_MIN));
 					auto ved = cur.lower_bound(std::make_pair(var, INT_MAX));
-					if (vst != ved && --ved == vst) {
-						Instruction &ins2 = instr[vst->second];
+					bool flag = true;
+					long long value = 0;
+					for (auto v = vst; v != ved; ++v) {
+						Instruction &ins2 = instr[v->second];
 						assert(ins2.op == Opcode::MOVE || ins2.op == Opcode::ENTER);
 						if (ins2.op == Opcode::MOVE && ins2.oper[0].type == Operand::CONST) {
-							ins.oper[o] = ins2.oper[0];
-							change = true;
-							propa_count++;
+							if (v == vst) {
+								value = ins2.oper[0].value;
+							} else if (value != ins2.oper[0].value) {
+								flag = false;
+							}
+						} else {
+							flag = false;
 						}
+						if (!flag)
+							break;
+					}
+					if (flag) {
+						ins.oper[o] = Operand();
+						ins.oper[o].type = Operand::CONST;
+						ins.oper[o].value = value;
+						change = true;
+						propa_count++;
 					}
 					break;
 				}
