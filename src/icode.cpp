@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cassert>
+#include <climits>
 #include <set>
 
 #include "icode.h"
@@ -150,24 +151,24 @@ Instruction::Instruction (FILE *in):
 	op = Opcode(buf);
 	if (op.operands() >= 1) {
 		fscanf(in, "%200s", buf);
-		oper1 = Operand(buf);
+		oper[0] = Operand(buf);
 	}
 	if (op.operands() >= 2) {
 		fscanf(in, "%200s", buf);
-		oper2 = Operand(buf);
+		oper[1] = Operand(buf);
 	}
 }
 
 void Instruction::icode (FILE *out)
 {
 	fprintf(out, "instr %lld: %s", addr, op.name());
-	if (oper1) {
+	if (oper[0]) {
 		fprintf(out, " ");
-		oper1.icode(out);
+		oper[0].icode(out);
 	}
-	if (oper2) {
+	if (oper[1]) {
 		fprintf(out, " ");
-		oper2.icode(out);
+		oper[1].icode(out);
 	}
 	fprintf(out, "\n");
 }
@@ -186,70 +187,70 @@ void Instruction::ccode (FILE *out)
 
 	switch(op) {
 	case Opcode::ADD:
-		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " + "); oper2.ccode(out);
+		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " + "); oper[1].ccode(out);
 		break;
 	case Opcode::SUB:
-		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " - "); oper2.ccode(out);
+		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " - "); oper[1].ccode(out);
 		break;
 	case Opcode::MUL:
-		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " * "); oper2.ccode(out);
+		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " * "); oper[1].ccode(out);
 		break;
 	case Opcode::DIV:
-		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " / "); oper2.ccode(out);
+		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " / "); oper[1].ccode(out);
 		break;
 	case Opcode::MOD:
-		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " %% "); oper2.ccode(out);
+		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " %% "); oper[1].ccode(out);
 		break;
 	case Opcode::NEG:
-		fprintf(out, "r[%lld] = ", addr); fprintf(out, "- "); oper1.ccode(out);
+		fprintf(out, "r[%lld] = ", addr); fprintf(out, "- "); oper[0].ccode(out);
 		break;
 	case Opcode::CMPEQ:
-		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " == "); oper2.ccode(out);
+		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " == "); oper[1].ccode(out);
 		break;
 	case Opcode::CMPLE:
-		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " <= "); oper2.ccode(out);
+		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " <= "); oper[1].ccode(out);
 		break;
 	case Opcode::CMPLT:
-		fprintf(out, "r[%lld] = ", addr); oper1.ccode(out); fprintf(out, " < "); oper2.ccode(out);
+		fprintf(out, "r[%lld] = ", addr); oper[0].ccode(out); fprintf(out, " < "); oper[1].ccode(out);
 		break;
 	case Opcode::BR:
-		fprintf(out, "goto "); oper1.ccode(out);
+		fprintf(out, "goto "); oper[0].ccode(out);
 		break;
 	case Opcode::BLBC:
-		fprintf(out, "if ("); oper1.ccode(out); fprintf(out, "== 0) goto "); oper2.ccode(out);
+		fprintf(out, "if ("); oper[0].ccode(out); fprintf(out, "== 0) goto "); oper[1].ccode(out);
 		break;
 	case Opcode::BLBS:
-		fprintf(out, "if ("); oper1.ccode(out); fprintf(out, "!= 0) goto "); oper2.ccode(out);
+		fprintf(out, "if ("); oper[0].ccode(out); fprintf(out, "!= 0) goto "); oper[1].ccode(out);
 		break;
 	case Opcode::CALL:
-		fprintf(out, "SP -= 8; MEM(SP) = %lld + 1; ", addr); oper1.ccode(out); fprintf(out, "()");
+		fprintf(out, "SP -= 8; MEM(SP) = %lld + 1; ", addr); oper[0].ccode(out); fprintf(out, "()");
 		break;
 	case Opcode::LOAD:
-		fprintf(out, "r[%lld] = MEM(", addr); oper1.ccode(out); fprintf(out, ")");
+		fprintf(out, "r[%lld] = MEM(", addr); oper[0].ccode(out); fprintf(out, ")");
 		break;
 	case Opcode::STORE:
-		fprintf(out, "MEM("); oper2.ccode(out); fprintf(out, ") = "); oper1.ccode(out);
+		fprintf(out, "MEM("); oper[1].ccode(out); fprintf(out, ") = "); oper[0].ccode(out);
 		break;
 	case Opcode::MOVE:
-		fprintf(out, "r[%lld] = ", addr); oper2.ccode(out); fprintf(out, " = "); oper1.ccode(out);
+		fprintf(out, "r[%lld] = ", addr); oper[1].ccode(out); fprintf(out, " = "); oper[0].ccode(out);
 		break;
 	case Opcode::READ:
 		fprintf(out, "ReadLong(r[%lld])", addr);
 		break;
 	case Opcode::WRITE:
-		fprintf(out, "WriteLong("); oper1.ccode(out); fprintf(out, ")");
+		fprintf(out, "WriteLong("); oper[0].ccode(out); fprintf(out, ")");
 		break;
 	case Opcode::WRL:
 		fprintf(out, "WriteLine()");
 		break;
 	case Opcode::PARAM:
-		fprintf(out, "SP -= 8; MEM(SP) = "); oper1.ccode(out);
+		fprintf(out, "SP -= 8; MEM(SP) = "); oper[0].ccode(out);
 		break;
 	case Opcode::ENTER:
-		fprintf(out, "SP -= 8; MEM(SP) = FP; FP = SP; SP -= "); oper1.ccode(out);
+		fprintf(out, "SP -= 8; MEM(SP) = FP; FP = SP; SP -= "); oper[0].ccode(out);
 		break;
 	case Opcode::RET:
-		fprintf(out, "SP = FP + 16 + "); oper1.ccode(out); fprintf(out, "; FP = MEM(FP)");
+		fprintf(out, "SP = FP + 16 + "); oper[0].ccode(out); fprintf(out, "; FP = MEM(FP)");
 		break;
 	}
 
@@ -264,9 +265,9 @@ void Instruction::ccode (FILE *out)
 int Instruction::get_branch_target () const
 {
 	if (op.type == Opcode::BR)
-		return oper1.value;
+		return oper[0].value;
 	if (op.type == Opcode::BLBC || op.type == Opcode::BLBS)
-		return oper2.value;
+		return oper[1].value;
 	if (op.type == Opcode::RET)
 		return 0;
 	return -1;
@@ -278,6 +279,93 @@ int Instruction::get_next_instr() const
 		return -1;
 	else
 		return addr + 1;
+}
+
+bool Instruction::isconst() const {
+	switch(op) {
+	case Opcode::ADD:
+	case Opcode::SUB:
+	case Opcode::MUL:
+	case Opcode::DIV:
+	case Opcode::MOD:
+	case Opcode::CMPEQ:
+	case Opcode::CMPLE:
+	case Opcode::CMPLT:
+		return oper[0].type == Operand::CONST && oper[1].type == Operand::CONST;
+	case Opcode::NEG:
+	case Opcode::MOVE:
+		return oper[0].type == Operand::CONST;
+	}
+	return false;
+}
+
+long long Instruction::constvalue() const {
+	if (!isconst()) return 0;
+	switch(op) {
+	case Opcode::ADD:
+		return oper[0].value + oper[1].value;
+	case Opcode::SUB:
+		return oper[0].value - oper[1].value;
+	case Opcode::MUL:
+		return oper[0].value * oper[1].value;
+	case Opcode::DIV:
+		return oper[0].value / oper[1].value;
+	case Opcode::MOD:
+		return oper[0].value % oper[1].value;
+	case Opcode::CMPEQ:
+		return oper[0].value == oper[1].value;
+	case Opcode::CMPLE:
+		return oper[0].value <= oper[1].value;
+	case Opcode::CMPLT:
+		return oper[0].value < oper[1].value;
+	case Opcode::NEG:
+		return -oper[0].value;
+	case Opcode::MOVE:
+		return oper[0].value;
+	}
+	return 0;
+}
+
+bool Instruction::isrightvalue(int o) const
+{
+	switch (o) {
+	case 0:
+		switch (op) {
+		case Opcode::ADD:
+		case Opcode::SUB:
+		case Opcode::MUL:
+		case Opcode::DIV:
+		case Opcode::MOD:
+		case Opcode::NEG:
+		case Opcode::CMPEQ:
+		case Opcode::CMPLE:
+		case Opcode::CMPLT:
+		case Opcode::BLBC:
+		case Opcode::BLBS:
+		case Opcode::STORE:
+		case Opcode::MOVE:
+		case Opcode::WRITE:
+		case Opcode::PARAM:
+		case Opcode::ENTER:
+		case Opcode::RET:
+			return true;
+		}
+		return false;
+	case 1:
+		switch (op) {
+		case Opcode::ADD:
+		case Opcode::SUB:
+		case Opcode::MUL:
+		case Opcode::DIV:
+		case Opcode::MOD:
+		case Opcode::CMPEQ:
+		case Opcode::CMPLE:
+		case Opcode::CMPLT:
+			return true;
+		}
+		return false;
+	}
+	return false;
 }
 
 Program::Program (FILE *in):
@@ -346,6 +434,103 @@ void Program::build_domtree()
 		f->build_domtree();
 }
 
+void Program::constant_propagate()
+{
+	int enter = -1;
+	std::list<std::pair<int, int> > funcs;
+
+	for (int i = 1; i < instr.size(); ++i) {
+		if (instr[i].op == Opcode::ENTER) {
+			assert(enter == -1);
+			enter = i;
+		} else if (instr[i].op == Opcode::RET) {
+			assert(enter > 0);
+			funcs.push_back(std::make_pair(enter, i+1));
+			enter = -1;
+		}
+	}
+
+	typedef std::set<std::pair<int, int> > iset;
+	for (auto f: funcs) {
+		int st = f.first, ed = f.second;
+		int fsize = instr[st].oper[0].value / 8;
+		std::vector<iset> rd(ed - st, iset()); // Reaching Definition IN
+		bool change;
+		do {
+			change = false;
+			for (int i = st; i < ed; ++i) {
+				iset &in = rd[i-st];
+				int def = 0;
+				if (instr[i].op == Opcode::MOVE && instr[i].oper[1] == Operand::LOCAL) {
+					def = instr[i].oper[1].value;
+					assert(def != 0);
+				}
+				std::pair<int, int> defp = std::make_pair(def, i);
+				int next_br = instr[i].get_branch_target();
+				if (next_br > 0) {
+					iset &to = rd[next_br-st];
+					for (auto pp: in) if (pp.first != def) {
+						if (to.find(pp) == to.end()) {
+							to.insert(pp);
+							change = true;
+						}
+					}
+					if (def != 0 && to.find(defp) == to.end()) {
+						to.insert(defp);
+						change = true;
+					}
+				}
+				int next_seq = instr[i].get_next_instr();
+				if (next_seq > 0) {
+					iset &to = rd[next_seq-st];
+					for (auto pp: in) if (pp.first != def) {
+						if (to.find(pp) == to.end()) {
+							to.insert(pp);
+							change = true;
+						}
+					}
+					if (def != 0 && to.find(defp) == to.end()) {
+						to.insert(defp);
+						change = true;
+					}
+				}
+			}
+		} while (change);
+		do {
+			change = false;
+			for (int i = st; i < ed; ++i) {
+				Instruction &ins = instr[i];
+				iset &in = rd[i-st];
+				for (int o = 0; o < 2; ++o) if (ins.isrightvalue(o)) switch(ins.oper[o].type) {
+				case Operand::LOCAL: {
+					int var = ins.oper[o].value;
+					auto vst = in.lower_bound(std::make_pair(var, INT_MIN));
+					auto ved = in.lower_bound(std::make_pair(var, INT_MAX));
+					if (vst != ved && --ved == vst) {
+						Instruction &ins2 = instr[vst->second];
+						assert(ins2.op == Opcode::MOVE);
+						if (ins2.oper[0].type == Operand::CONST) {
+							ins.oper[o] = ins2.oper[0];
+							change = true;
+						}
+					}
+					break;
+				}
+				case Operand::REG:{
+					Instruction &ins2 = instr[ins.oper[o].value];
+					if (ins2.isconst()) {
+						ins.oper[o] = Operand();
+						ins.oper[o].type = Operand::CONST;
+						ins.oper[o].value = ins2.constvalue();
+						change = true;
+					}
+				}
+				}
+			}
+		} while(change);
+	}
+}
+
 Program::~Program()
 {
     for (Function* func : funcs)
@@ -356,7 +541,7 @@ Function::Function(Program* prog, int enter, int exit)
     : prog(prog)
 {
     assert(prog->instr[enter].op == Opcode::ENTER);
-    frame_size = prog->instr[enter].oper1.value;
+    frame_size = prog->instr[enter].oper[0].value;
     is_main = prog->instr[enter - 1].op == Opcode::ENTRYPC;
 
     std::set<int> bounds;  // boundaries of blocks

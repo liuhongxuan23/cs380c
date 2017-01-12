@@ -41,7 +41,7 @@ struct Operand {
 	std::string tag;
 	Operand (): type(UNKNOWN), value(0), tag() {}
 	Operand (const char *str);
-	operator bool() { return type != UNKNOWN; }
+	operator Type() const { return type; }
 	void icode (FILE *out);
 	void ccode (FILE *out);
 };
@@ -49,8 +49,7 @@ struct Operand {
 struct Instruction {
 	long long addr;
 	Opcode op;
-	Operand oper1;
-	Operand oper2;
+	Operand oper[2];
 	Instruction (): addr(-1) {}
 	Instruction (FILE *in);
 	void icode (FILE *out);
@@ -58,6 +57,9 @@ struct Instruction {
 	operator bool() { return bool(op); }
         int get_branch_target () const;
 	int get_next_instr() const;
+	bool isconst() const;
+	long long constvalue() const;
+	bool isrightvalue(int o) const;
 };
 
 class Function;
@@ -100,4 +102,5 @@ struct Program {
 	void ccode (FILE *out);
         void find_functions();
 	void build_domtree();
+	void constant_propagate();
 };
