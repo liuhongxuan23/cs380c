@@ -1,9 +1,11 @@
 
+#include <cassert>
 #include <string>
 #include <vector>
 #include <list>
 #include <stack>
 #include <map>
+#include <set>
 #include <unordered_set>
 #include <unordered_map>
 
@@ -105,12 +107,22 @@ public:
     Function* func;
     Block* seq_next = nullptr;
     Block* br_next = nullptr;
+    Block* seq_next2 = nullptr;
     std::vector<Instruction> instr;
     std::vector<Block*> prevs;
+    std::vector<Block*> prevs2;
     Block *idom = NULL;
     std::list<Block*> domc;
 
-    long long addr() const { return instr[0].addr; }
+    std::vector<Instruction> insert;
+
+    long long addr() const {
+        int i = 0;
+        while (i < instr.size() && instr[i].op == Opcode::NOP) i++;
+        if (i < instr.size()) return instr[i].addr;
+        assert(seq_next == seq_next2);
+        return seq_next2->addr();
+    }
 
     // SSA
     std::vector<Block*> df;
@@ -135,6 +147,7 @@ public:
     int arg_count;
     bool is_main;
     std::map<int, Block*> blocks;
+    std::map<Block*, std::set<Block*> > loops;
     Block* entry;
 
     void build_domtree();
@@ -146,6 +159,7 @@ public:
     void place_phi();
     void remove_phi();
     void ssa_constant_propagate();
+    void ssa_licm();
 };
 
 struct Program {
@@ -171,6 +185,7 @@ struct Program {
         void place_phi();
         void remove_phi();
         void ssa_rename_var();
+        void ssa_licm();
         void ssa_constant_propagate();
 
         void ssa_icode(FILE* out);

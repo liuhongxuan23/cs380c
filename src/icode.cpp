@@ -423,9 +423,9 @@ void Program::icode (FILE *out) const
         if (func->is_main)
             fprintf(out, "instr %lld: entrypc\n", func->entry->addr() - 1);
 
-        for (auto& addr_block : func->blocks) {
-            Block* block = addr_block.second;
-            for (int i = 0; i < block->instr.size(); ++i)
+        for (Block* block = func->entry; block != nullptr; block = block->seq_next2) {
+            block->instr.back().set_br_addr(block->br_next->addr());
+            for (int i = 0; i < block->instr.size() - 1; ++i)
                 if (block->instr[i].op != Opcode::NOP)
                     block->instr[i].icode(out);
         }
@@ -554,6 +554,7 @@ Function::Function(Program* prog, int a, int b)
         b->seq_next = (op != Opcode::BR && op != Opcode::RET) ? blocks[end] : nullptr;
 	if (b->seq_next)
 		b->seq_next->prevs.push_back(b);
+        b->seq_next2 = (op != Opcode::RET) ? blocks[end] : nullptr;
 
         int br = b->instr.back().get_branch_target();
         b->br_next = (br > 0) ? blocks[br] : nullptr;
@@ -614,6 +615,36 @@ void Function::build_domtree()
 			}
 		}
 	} while(change);
+	std::multimap<Block*, Block*> backedge;
+	for (auto pb: blocks) {
+		Block *b = pb.second;
+		blockset &bs = dominators.find(b)->second;
+		if (b->seq_next != NULL && bs.find(b->seq_next) != bs.end())
+			backedge.insert(std::make_pair(b->seq_next, b));
+		if (b->br_next != NULL && bs.find(b->br_next) != bs.end())
+			backedge.insert(std::make_pair(b->br_next, b));
+	}
+	for (auto pb: blocks) {
+		Block *b = pb.second;
+		auto st = backedge.lower_bound(b), ed = backedge.upper_bound(b);
+		if (st != ed) {
+			loops[b] = blockset();
+			blockset candid, &loop = loops[b];
+			loop.insert(b);
+			for (auto i = st; i != ed; ++i) {
+				candid.insert(i->second);
+				loop.insert(i->second);
+			}
+			while (!candid.empty()) {
+				Block *s = *candid.begin();
+				candid.erase(candid.begin());
+				for (Block *t: s->prevs) if (loop.find(t) == loop.end()) {
+					candid.insert(t);
+					loop.insert(t);
+				}
+			}
+		}
+	}
 	for (auto pb: blocks) {
 		Block *b = pb.second;
 		b->idom = NULL;

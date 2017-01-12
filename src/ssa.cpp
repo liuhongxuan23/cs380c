@@ -6,6 +6,7 @@
 using std::string;
 using std::vector;
 using std::map;
+using std::multimap;
 using std::unordered_set;
 using std::unordered_map;
 using std::pair;
@@ -256,6 +257,94 @@ void Function::ssa_constant_propagate()
     }
 }
 
+void Function::ssa_licm()
+{
+    map<Operand, Block*> oper2block;
+    for (auto addr_block : blocks) {
+        Block* b = addr_block.second;
+        for (int i = 0; i < b->instr.size(); ++i) {
+            auto& in = b->instr[i];
+            if (in.op == Opcode::MOVE)
+                oper2block[in.oper[1]] = b;
+            oper2block[reg_oper(in)] = b;
+        }
+    }
+
+    unordered_map<Block*, int> loop_cnt;
+
+    for (auto head_loop : loops) {
+        Block* head = head_loop.first;
+        auto& loop = head_loop.second;
+        for (Block* b : loop)
+            loop_cnt[b]++;
+    }
+
+    multimap<int, Block*> order;
+    for (auto block_cnt : loop_cnt)
+        order.insert(make_pair(block_cnt.second, block_cnt.first));
+
+    Instruction bak;
+
+    for (auto cnt_block : order) {
+        Block *b = cnt_block.second;
+        for (auto& in : b->instr) {
+            Block* b0 = nullptr;
+            if (in.isrightvalue(0) && (in.oper[0].type == Operand::LOCAL || in.oper[0].type == Operand::REG))
+                b0 = oper2block[in.oper[0]];
+            Block* b1 = nullptr;
+            if (in.isrightvalue(1) && (in.oper[1].type == Operand::LOCAL || in.oper[1].type == Operand::REG))
+                b1 = oper2block[in.oper[1]];
+
+            if (in.addr == 9) printf("%d %d\n", b0->addr(), b1->addr());
+
+            Block* last = nullptr;
+            for (Block *loop_header = b; loop_header != NULL; loop_header = loop_header->idom) {
+                for (; loop_header && loops.count(loop_header) == 0; loop_header = loop_header->idom) { }
+                if (loop_header == nullptr) break;
+                if (loops[loop_header].count(b0) > 0 || loops[loop_header].count(b1) > 0) break;
+                last = loop_header;
+            }
+
+            if (in.addr == 9) printf("%d\n", last->addr());
+
+            if (last == nullptr) continue;
+
+            last->insert.push_back(in);
+            in.erase();
+        }
+    }
+
+    for (auto b_loop : loops) {
+        Block* b = b_loop.first;
+        if (b->insert.empty()) continue;
+
+        Block* newb = new Block(this, b->insert);
+        newb->seq_next = b;
+        newb->seq_next2 = b;
+        // TODO: insert to blocks
+
+        blocks[100000000 + b->instr[0].addr] = newb;
+
+        for (Block* prev : b->prevs) {
+            if (loops[b].count(prev) > 0) {
+                assert(prev->seq_next != b);
+                newb->prevs.push_back(prev);
+                continue;
+            }
+
+            if (prev->seq_next == b) {
+                prev->seq_next = newb;
+                prev->seq_next2 = newb;
+            }
+
+            if (prev->br_next == b) prev->br_next = newb;
+        }
+
+        newb->prevs.swap(b->prevs);
+        b->prevs.push_back(newb);
+    }
+}
+
 void Program::ssa_icode(FILE* out)
 {
     ssa_mode = true;
@@ -273,9 +362,8 @@ void Program::ssa_icode(FILE* out)
             n += block->phi.size() * 2;
         }
 
-        for (auto& addr_block : func->blocks) {
-            auto& block = addr_block.second;
-            long long addr = block->ssa_addr;
+        for (Block* block = func->entry; block != nullptr; block = block->seq_next2) {
+            long long phi_addr = block->ssa_addr;
 
             for (auto& var_phi : block->phi) {
                 int var = var_phi.first;
@@ -283,7 +371,7 @@ void Program::ssa_icode(FILE* out)
                 if (phi.r.empty()) continue;
                 string tag = func->offset2tag[var];
 
-                fprintf(out, "instr %lld: phi", addr);
+                fprintf(out, "instr %lld: phi", phi_addr);
                 for (const Operand& oper : phi.r) {
                     if (oper.type == Operand::LOCAL) {
                         fprintf(out, " %s$%d", tag.c_str(), oper.ssa_idx);
@@ -294,9 +382,9 @@ void Program::ssa_icode(FILE* out)
                 }
                 fputc('\n', out);
 
-                fprintf(out, "instr %lld: move (%lld) %s$%d\n", addr + 1, addr, tag.c_str(), phi.l);
+                fprintf(out, "instr %lld: move (%lld) %s$%d\n", phi_addr + 1, phi_addr, tag.c_str(), phi.l);
 
-                addr += 2;
+                phi_addr += 2;
             }
 
             for (int i = 0; i < block->instr.size() - 1; ++i)
@@ -351,6 +439,12 @@ void Program::ssa_rename_var()
         map<int, RenameStack> stack;
         func->entry->ssa_rename_var(stack);
     }
+}
+
+void Program::ssa_licm()
+{
+    for (Function* func : funcs)
+        func->ssa_licm();
 }
 
 void Program::ssa_constant_propagate()

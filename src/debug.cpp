@@ -2,6 +2,28 @@
 
 #include <cstdio>
 
+void print_cfg(Program *prog) {
+	for (auto func: prog->funcs) {
+		printf("Function: %lld\n", func->blocks.cbegin()->second->instr[0].addr);
+
+		printf("Basic blocks:");
+		for (auto iter : func->blocks)
+			printf(" %lld", iter.second->instr[0].addr);
+
+		printf("\nCFG:\n");
+		for (auto iter : func->blocks) {
+			Block* b = iter.second;
+			printf("%lld ->", b->instr[0].addr);
+			if (b->seq_next != nullptr)
+				printf(" %lld", b->seq_next->instr[0].addr);
+			if (b->br_next != nullptr)
+				printf(" %lld", b->br_next->instr[0].addr);
+			putchar('\n');
+		}
+	}
+}
+
+
 int main() {
     Program prog(fopen("debug.txt", "r"));
 
@@ -12,10 +34,15 @@ int main() {
     prog.place_phi();
     prog.ssa_rename_var();
 
-    prog.ssa_constant_propagate();
-    prog.remove_phi();
+    prog.ssa_licm();
+    print_cfg(&prog);
 
+    prog.remove_phi();
     prog.icode(stdout);
+
+    //prog.ssa_constant_propagate();
+
+    //prog.icode(stdout);
 
     //    printf("Basic blocks:");
     //    for (auto iter : func->blocks)
