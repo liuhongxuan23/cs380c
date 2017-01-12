@@ -3,13 +3,13 @@ CXXFLAGS=-std=gnu++11 -g
 
 .PHONY: all
 
-all: ccode cfg dom
+all: ccode dom debug
 
-ccode: icode.o ccode.o
+ccode: icode.o ssa.o ccode.o
 
-cfg: icode.o cfg.o
+dom: icode.o ssa.o dom.o
 
-dom: icode.o dom.o
+debug: icode.o ssa.o debug.o
 
 clean:
 	-rm *.o
