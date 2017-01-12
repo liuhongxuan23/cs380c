@@ -6,13 +6,17 @@
 
 enum Opt {
 	SCP, //simple constant propagation
-	DSL, //dead statement elimination
+	DSE, //dead statement elimination
+        LICM, // loop invariant code motion
+        SSA,
 	MAX_OPT,
 };
 
 const char *optname[] = {
 	[SCP] = "scp",
-	[DSL] = "dsl",
+	[DSE] = "dse",
+        [LICM] = "licm",
+        [SSA] = "ssa",
 };
 
 enum Backend {
@@ -28,6 +32,7 @@ const char *backendname[] = {
 	[C] = "c",
 	[CFG] = "cfg",
 	[REP] = "rep",
+        [SSA] = "ssa",
 };
 
 void print_cfg(Program *prog) {
@@ -119,13 +124,24 @@ int main(int argc, char **argv) {
 	Program prog(stdin);
 	prog.find_functions();
 
+        bool ssa_on = false;
+
 	for (Opt o: opts) switch(o) {
 	case SCP:
-		prog.constant_propagate();
+                if (ssa_on)
+                    prog.ssa_constant_propagate();
+                else
+                    prog.constant_propagate();
 		break;
-	case DSL:
+	case DSE:
 		prog.dead_eliminate();
 		break;
+        case SSA:
+                prog.ssa_prepare();
+                ssa_on = true;
+                break;
+        case LICM:
+                break;
 	}
 	switch(b) {
 	case THREEADDR:

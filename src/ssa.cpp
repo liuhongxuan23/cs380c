@@ -358,3 +358,13 @@ void Program::ssa_constant_propagate()
     for (Function* func : funcs)
         func->ssa_constant_propagate();
 }
+
+void Program::ssa_prepare()
+{
+    find_functions();
+    build_domtree();
+    compute_df();
+    find_defs();
+    place_phi();
+    ssa_rename_var();
+}

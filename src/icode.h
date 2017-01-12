@@ -164,6 +164,8 @@ struct Program {
         // SSA
         int instr_cnt = 0;
 
+        void ssa_prepare();
+
         void compute_df();
         void find_defs();
         void place_phi();
