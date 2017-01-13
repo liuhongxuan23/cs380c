@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <algorithm>
+#include <unordered_map>
 
 using std::string;
 using std::vector;
@@ -281,8 +282,9 @@ void Function::ssa_constant_propagate()
     }
 }
 
-void Phi::icode(FILE* out) const
+void Phi::icode(FILE* out, Localvar* var) const
 {
+    if (r.empty()) return;
     fprintf(out, "instr %lld: phi", name);
     for (const Operand& oper : r) {
         if (oper.is_local()) {
@@ -292,50 +294,51 @@ void Phi::icode(FILE* out) const
             fprintf(out, " %lld", oper.value_const);
         }
     }
-    fprintf(out, "\ninstr %lld: move (%lld) %s$%d\n", name + 1, name, r[0].var->name.c_str(), l);
+    fprintf(out, "\ninstr %lld: move (%lld) %s$%d\n", name + 1, name, var->name.c_str(), l);
 }
 
-
-/*
-void Function::ssa_licm()
+static inline map<Operand, Block*> calc_oper2block(Function* f)
 {
-    map<Operand, Block*> oper2block;
-    for (auto addr_block : blocks) {
-        Block* b = addr_block.second;
-        for (int i = 0; i < b->instr.size(); ++i) {
-            auto& in = b->instr[i];
-            if (in.op == Opcode::MOVE)
-                oper2block[in.oper[1]] = b;
-            oper2block[reg_oper(in)] = b;
+    map<Operand, Block*> ret;
+    for (Block* b : f->blocks)
+        for (Instruction* in : b->instr) {
+            if (in->is_move())
+                ret[in->oper[1]] = b;
+            ret[reg_oper(in)] = b;
         }
-    }
+    return ret;
+}
 
-    unordered_map<Block*, int> loop_cnt;
-
-    for (auto head_loop : loops) {
-        Block* head = head_loop.first;
-        auto& loop = head_loop.second;
-        for (Block* b : loop)
-            loop_cnt[b]++;
-    }
+static inline vector<Block*> calc_loop_order(Function* f)
+{
+    unordered_map<Block*, int> cnt;
+    for (auto& head_loop : f->loops)
+        for (Block* b : head_loop.second)
+            ++cnt[b];
 
     multimap<int, Block*> order;
-    for (auto block_cnt : loop_cnt)
+    for (auto& block_cnt : cnt)
         order.insert(make_pair(block_cnt.second, block_cnt.first));
 
-    Instruction bak;
+    vector<Block*> ret;
+    for (auto& cnt_block : order)
+        ret.push_back(cnt_block.second);
+    return ret;
+}
 
-    for (auto cnt_block : order) {
-        Block *b = cnt_block.second;
-        for (auto& in : b->instr) {
+void Function::ssa_licm()
+{
+    map<Operand, Block*> oper2block = calc_oper2block(this);
+    vector<Block*> loop_order = calc_loop_order(this);
+
+    for (Block* b : loop_order) {
+        for (Instruction* in : b->instr) {
             Block* b0 = nullptr;
-            if (in.isrightvalue(0) && (in.oper[0].type == Operand::LOCAL || in.oper[0].type == Operand::REG))
-                b0 = oper2block[in.oper[0]];
+            if (in->isrightvalue(0) && (in->oper[0].type == Operand::LOCAL || in->oper[0].type == Operand::REG))
+                b0 = oper2block[in->oper[0]];
             Block* b1 = nullptr;
-            if (in.isrightvalue(1) && (in.oper[1].type == Operand::LOCAL || in.oper[1].type == Operand::REG))
-                b1 = oper2block[in.oper[1]];
-
-            if (in.addr == 9) printf("%d %d\n", b0->addr(), b1->addr());
+            if (in->isrightvalue(1) && (in->oper[1].type == Operand::LOCAL || in->oper[1].type == Operand::REG))
+                b1 = oper2block[in->oper[1]];
 
             Block* last = nullptr;
             for (Block *loop_header = b; loop_header != NULL; loop_header = loop_header->idom) {
@@ -345,12 +348,10 @@ void Function::ssa_licm()
                 last = loop_header;
             }
 
-            if (in.addr == 9) printf("%d\n", last->addr());
-
             if (last == nullptr) continue;
 
-            last->insert.push_back(in);
-            in.erase();
+            last->insert.push_back(new Instruction(*in));
+            in->erase();
         }
     }
 
@@ -358,33 +359,33 @@ void Function::ssa_licm()
         Block* b = b_loop.first;
         if (b->insert.empty()) continue;
 
-        Block* newb = new Block(this, b->insert);
+        Block* newb = new Block(this, b->insert.begin(), b->insert.end());
+
+        vector<Block*> old_prevs;
+        old_prevs.swap(b->prevs);
+
         newb->seq_next = b;
-        newb->seq_next2 = b;
-        // TODO: insert to blocks
+        newb->order_next = b;
+        blocks.push_back(newb);
 
-        blocks[100000000 + b->instr[0].addr] = newb;
-
-        for (Block* prev : b->prevs) {
+        for (Block* prev : old_prevs) {
             if (loops[b].count(prev) > 0) {
+                b->prevs.push_back(prev);
                 assert(prev->seq_next != b);
+            } else {
                 newb->prevs.push_back(prev);
-                continue;
+                if (prev->seq_next == b) prev->seq_next = newb;
+                if (prev->br_next == b) {
+                    prev->br_next = newb;
+                    prev->instr.back()->set_branch(newb);
+                }
+                if (prev->order_next == b) prev->order_next = newb;
             }
-
-            if (prev->seq_next == b) {
-                prev->seq_next = newb;
-                prev->seq_next2 = newb;
-            }
-
-            if (prev->br_next == b) prev->br_next = newb;
         }
-
-        newb->prevs.swap(b->prevs);
-        b->prevs.push_back(newb);
     }
 }
 
+/*
 void Program::ssa_icode(FILE* out)
 {
     ssa_mode = true;
@@ -471,12 +472,13 @@ void Program::remove_phi()
 void Program::ssa_rename_var()
 {
 }
+*/
 
 void Program::ssa_licm()
 {
     for (Function* func : funcs)
         func->ssa_licm();
-}*/
+}
 
 void Program::ssa_prepare()
 {
@@ -498,6 +500,49 @@ void Program::ssa_prepare()
 
 void Program::ssa_constant_propagate()
 {
-    for (Function* func : funcs)
-        func->ssa_constant_propagate();
+    for (Function* f : funcs)
+        f->ssa_constant_propagate();
+}
+
+void Block::append(Instruction* in)
+{
+    if (br_next == nullptr)
+        instr.push_back(in);
+    else {
+        auto bak = instr.back();
+        instr.back() = in;
+        instr.push_back(bak);
+    }
+}
+
+void Program::ssa_to_3addr()
+{
+    for (Function* f : funcs)
+        for (Block* b : f->blocks)
+            for (auto& var_phi : b->phi) {
+                Localvar* var = var_phi.first;
+                Phi& phi = var_phi.second;
+
+                if (!phi.empty()) {
+                    for (int i = 0; i < phi.r.size(); ++i) {
+                        if (phi.r[i].is_const()) {
+                            Instruction* in = new Instruction();
+                            in->op.type = Opcode::MOVE;
+                            in->oper[0].type = Operand::CONST;
+                            in->oper[0].value_const = phi.r[i].value_const;
+                            in->oper[1].type = Operand::LOCAL;
+                            in->oper[1].var = var;
+                            phi.pre[i]->append(in);
+                        }
+                    }
+                    phi.clear();
+                }
+            }
+
+    for (Function* f : funcs)
+        for (Block* b : f->blocks)
+            for (Instruction* in : b->instr) {
+                in->oper[0].ssa_idx = -1;
+                in->oper[1].ssa_idx = -1;
+            }
 }

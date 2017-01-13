@@ -27,7 +27,6 @@ int main() {
 
     prog.build_domtree();
 
-    //print_cfg(&prog);
     prog.ssa_prepare();
     //prog.find_defs();
     //prog.place_phi();
@@ -40,6 +39,9 @@ int main() {
     //prog.ssa_icode(stdout);
 
     prog.ssa_constant_propagate();
+    prog.ssa_licm();
+    prog.ssa_to_3addr();
+    prog.rename();
     prog.icode(stdout);
 
     //prog.icode(stdout);

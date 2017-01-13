@@ -124,7 +124,7 @@ void Operand::icode (FILE *out) const
 			fprintf(out, "%s#%lld", tag.c_str(), value_const);
 		break;
 	case LOCAL:
-		if (ssa_idx == -1 || !Program::ssa_mode)
+		if (ssa_idx == -1)// || !Program::ssa_mode)
 			fprintf(out, "%s#%lld", var->name.c_str(), var->offset);
 		else
 			fprintf(out, "%s$%d", var->name.c_str(), ssa_idx);
@@ -471,7 +471,6 @@ void Program::rename()
 
 void Program::icode (FILE *out)
 {
-	rename();
 	ssa_mode = false;
 	fprintf(out, "instr 1: nop\n");
 	int i;
@@ -489,7 +488,6 @@ void Program::icode (FILE *out)
 
 void Program::ccode (FILE *out)
 {
-	rename();
 	fprintf(out, "%s",
 	"#include <stdio.h>\n"
 	"#define WriteLine() printf(\"\\n\");\n"
@@ -650,15 +648,15 @@ int Function::rename(int i)
 {
 	for (Block *p = entry; p != NULL; p = p->order_next) {
 		assert(!p->instr.empty());
+		p->name = i;
                 for (auto& var_phi : p->phi) 
                     if (!var_phi.second.r.empty()) {
                         var_phi.second.name = i;
                         i += 2;
                     }
-		for (Instruction *ins: p->instr) {
+		for (Instruction *ins: p->instr) if (ins->op != Opcode::NOP) {
 			ins->name = i++;
 		}
-		p->name = p->instr.front()->name;
 	}
 	// Function name not change
 	//name = entry->name;
@@ -671,7 +669,7 @@ void Function::ccode(FILE *out) const
 
 	for (Block *p = entry; p != NULL; p = p->order_next) {
 		assert(!p->instr.empty());
-		for (Instruction *ins: p->instr)
+		for (Instruction *ins: p->instr) if (ins->op != Opcode::NOP)
 			ins->ccode(out);
 	}
 
@@ -684,8 +682,8 @@ int Function::icode(FILE *out) const
 	for (Block *p = entry; p != NULL; p = p->order_next) {
 		assert(!p->instr.empty());
                 for (auto& var_phi : p->phi)
-                    var_phi.second.icode(out);
-		for (Instruction *ins: p->instr)
+                    var_phi.second.icode(out, var_phi.first);
+		for (Instruction *ins: p->instr) if (ins->op != Opcode::NOP)
 			ins->icode(out);
 		i = p->instr.back()->name;
 	}

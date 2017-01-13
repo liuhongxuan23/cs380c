@@ -108,7 +108,8 @@ struct Phi {
     void clear() { r.clear(); pre.clear(); }
     long long value() const { return r[0].value_const; }
     bool is_const() const;
-    void icode(FILE* out) const;
+    void icode(FILE* out, Localvar* var) const;
+    bool empty() const { return r.empty(); }
 };
 
 struct RenameStack {
@@ -138,7 +139,7 @@ public:
     Block *idom = NULL;
     std::list<Block*> domc;
 
-    std::vector<Instruction> insert;
+    std::vector<Instruction*> insert;
 
     long long addr() const {
 	/* TODO */
@@ -154,6 +155,8 @@ public:
     void compute_df();
     void find_defs();
     void ssa_rename_var(std::map<Localvar*, RenameStack>& stack);
+
+    void append(Instruction* in);
 };
 
 struct Localvar {
@@ -218,6 +221,7 @@ struct Program {
         void ssa_rename_var();
         void ssa_licm();
         void ssa_constant_propagate();
+        void ssa_to_3addr();
 
         void ssa_icode(FILE* out);
 

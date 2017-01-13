@@ -25,6 +25,7 @@ enum Backend {
 	CFG,
 	REP,
 	DOM,
+        SSA_3ADDR,
 	MAX_BACKEND,
 };
 
@@ -33,8 +34,8 @@ const char *backendname[] = {
 	[C] = "c",
 	[CFG] = "cfg",
 	[REP] = "rep",
-        //[SSA] = "ssa",
 	[DOM] = "dom",
+        [SSA_3ADDR] = "ssa,3addr",
 };
 
 void print_cfg(Program *prog) {
@@ -166,20 +167,27 @@ int main(int argc, char **argv) {
 	for (Opt o: opts) switch(o) {
 	case SCP:
                 if (ssa_on) {
-                    //prog.ssa_constant_propagate();
+                    prog.ssa_constant_propagate();
                  } else
                     prog.constant_propagate();
 		break;
 	case DSE:
-		prog.dead_eliminate();
+                if (!ssa_on)
+                    prog.dead_eliminate();
 		break;
         case SSA:
-                //prog.ssa_prepare();
+                prog.ssa_prepare();
                 ssa_on = true;
                 break;
         case LICM:
+                if (ssa_on)
+                    prog.ssa_licm();
                 break;
 	}
+
+        if (ssa_on && b != SSA_3ADDR)
+            prog.ssa_to_3addr();
+
 	prog.rename();
 	switch(b) {
 	case THREEADDR:
@@ -194,6 +202,9 @@ int main(int argc, char **argv) {
 	case DOM:
 		print_dom(&prog);
 		break;
+        case SSA_3ADDR:
+                prog.icode(stdout);
+                break;
 	}
 
 	return 0;
