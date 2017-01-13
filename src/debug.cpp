@@ -3,44 +3,44 @@
 #include <cstdio>
 
 void print_cfg(Program *prog) {
-	for (auto func: prog->funcs) {
-		printf("Function: %lld\n", func->blocks.cbegin()->second->instr[0].addr);
+	for (Function *func: prog->funcs) {
+		printf("Function: %d\n", func->name);
 
 		printf("Basic blocks:");
-		for (auto iter : func->blocks)
-			printf(" %lld", iter.second->instr[0].addr);
+		for (Block *b = func->entry; b != NULL; b = b->order_next)
+			printf(" %d", b->name);
 
 		printf("\nCFG:\n");
-		for (auto iter : func->blocks) {
-			Block* b = iter.second;
-			printf("%lld ->", b->instr[0].addr);
+		for (Block *b = func->entry; b != NULL; b = b->order_next) {
+			printf("%d ->", b->name);
 			if (b->seq_next != nullptr)
-				printf(" %lld", b->seq_next->instr[0].addr);
+				printf(" %d", b->seq_next->name);
 			if (b->br_next != nullptr)
-				printf(" %lld", b->br_next->instr[0].addr);
+				printf(" %d", b->br_next->name);
 			putchar('\n');
 		}
 	}
 }
 
-
 int main() {
     Program prog(fopen("debug.txt", "r"));
 
-    prog.find_functions();
     prog.build_domtree();
-    prog.compute_df();
-    prog.find_defs();
-    prog.place_phi();
-    prog.ssa_rename_var();
 
-    prog.ssa_licm();
-    print_cfg(&prog);
+    //print_cfg(&prog);
+    prog.ssa_prepare();
+    //prog.find_defs();
+    //prog.place_phi();
+    //prog.ssa_rename_var();
 
-    prog.remove_phi();
+    //prog.ssa_licm();
+    //print_cfg(&prog);
+
+    //prog.remove_phi();
+    //prog.ssa_icode(stdout);
+
+    prog.ssa_constant_propagate();
     prog.icode(stdout);
-
-    //prog.ssa_constant_propagate();
 
     //prog.icode(stdout);
 
@@ -68,26 +68,25 @@ int main() {
     //        putchar('\n');
     //    }
 
+    //for (Function* f : prog.funcs) {
     //    printf("\nDF:\n");
-    //    for (auto iter : func->blocks) {
-    //        Block *b = iter.second;
-    //        printf("%lld :", b->addr());
+    //    for (Block* b : f->blocks) {
+    //        printf("%lld :", b->name);
     //        for (Block *df: b->df)
-    //            printf(" %lld", df->addr());
+    //            printf(" %lld", df->name);
     //        putchar('\n');
     //    }
 
     //    printf("\nPhi:\n");
-    //    for (auto iter : func->blocks) {
-    //        Block *b = iter.second;
-    //        printf("%lld :\n", b->addr());
+    //    for (Block* b : f->blocks) {
+    //        printf("%lld :\n", b->name);
     //        for (const auto& var_phi : b->phi) {
-    //            const std::string& var = var_phi.first;
+    //            Localvar* var = var_phi.first;
     //            const Phi& phi = var_phi.second;
 
-    //            printf("  [%s] %d <-", var.c_str(), phi.l);
-    //            for (int idx : phi.r)
-    //                printf(" %d", idx);
+    //            printf("  [%s] %d <-", var->name.c_str(), phi.l);
+    //            for (auto op : phi.r)
+    //                printf(" %d", op.ssa_idx);
     //            putchar('\n');
     //        }
     //        putchar('\n');

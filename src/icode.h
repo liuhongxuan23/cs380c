@@ -92,14 +92,23 @@ struct Instruction {
 	bool eliminable() const;
 
         void erase();
+        bool is_move() const { return op == Opcode::MOVE; }
 };
 
 class Function;
 class Program;
 
 struct Phi {
+    int name = 0;
     int l;
     std::vector<Operand> r;
+    std::vector<Block*> pre;
+
+    void init(std::vector<Block*>& p) { pre = p; r.resize(p.size()); }
+    void clear() { r.clear(); pre.clear(); }
+    long long value() const { return r[0].value_const; }
+    bool is_const() const;
+    void icode(FILE* out) const;
 };
 
 struct RenameStack {
@@ -138,13 +147,13 @@ public:
 
     // SSA
     std::vector<Block*> df;
-    std::unordered_set<int> defs;
-    std::unordered_map<int, Phi> phi;
+    std::unordered_set<Localvar*> defs;
+    std::unordered_map<Localvar*, Phi> phi;
     long long ssa_addr = 0;
 
     void compute_df();
     void find_defs();
-    void ssa_rename_var(std::map<int, RenameStack>& stack);
+    void ssa_rename_var(std::map<Localvar*, RenameStack>& stack);
 };
 
 struct Localvar {

@@ -650,6 +650,11 @@ int Function::rename(int i)
 {
 	for (Block *p = entry; p != NULL; p = p->order_next) {
 		assert(!p->instr.empty());
+                for (auto& var_phi : p->phi) 
+                    if (!var_phi.second.r.empty()) {
+                        var_phi.second.name = i;
+                        i += 2;
+                    }
 		for (Instruction *ins: p->instr) {
 			ins->name = i++;
 		}
@@ -678,6 +683,8 @@ int Function::icode(FILE *out) const
 	int i;
 	for (Block *p = entry; p != NULL; p = p->order_next) {
 		assert(!p->instr.empty());
+                for (auto& var_phi : p->phi)
+                    var_phi.second.icode(out);
 		for (Instruction *ins: p->instr)
 			ins->icode(out);
 		i = p->instr.back()->name;

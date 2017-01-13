@@ -40,25 +40,21 @@ void Block::compute_df()
 
 void Block::find_defs()
 {
-    for (Instruction& in : instr) {
-        const auto& oper = in.oper[1];
-        if (in.op == Opcode::MOVE && oper.is_local()) {
-            defs.insert(oper.value);
-            func->offset2tag[oper.value] = oper.tag;
-        }
-    }
+    for (Instruction* in : instr)
+        if (in->is_move() && in->oper[1].is_local())
+            defs.insert(in->oper[1].var);
 }
 
 void Function::place_phi()
 {
-    unordered_map<int, vector<Block*>> def_sites;
+    unordered_map<Localvar*, vector<Block*>> def_sites;
 
-    for (const auto& addr_block : blocks)
-        for (int var : addr_block.second->defs)
-            def_sites[var].push_back(addr_block.second);
+    for (Block* b : blocks)
+        for (Localvar* var : b->defs)
+            def_sites[var].push_back(b);
 
     for (auto& var_blocks : def_sites) {
-        int var = var_blocks.first;
+        Localvar* var = var_blocks.first;
         auto& blocks = var_blocks.second;
 
         while (!blocks.empty()) {
@@ -67,7 +63,7 @@ void Function::place_phi()
 
             for (Block* df : b->df)
                 if (df->phi.count(var) == 0) {
-                    df->phi[var].r.resize(df->prevs.size());
+                    df->phi[var].init(df->prevs);
                     if (df->defs.count(var) == 0)
                         blocks.push_back(df);
                 }
@@ -75,33 +71,67 @@ void Function::place_phi()
     }
 }
 
-bool Operand::operator< (const Operand& o) const
-{
-    if (type < o.type) return true;
-    if (type > o.type) return false;
-    if (value < o.value) return true;
-    if (value > o.value) return false;
-    return ssa_idx < o.ssa_idx;
-}
-
-static Operand ssa_oper(int var, int idx)
+static Operand ssa_oper(Localvar* var, int idx)
 {
     Operand r;
     r.type = Operand::LOCAL;
-    r.value = var;
+    r.var = var;
     r.ssa_idx = idx;
     return r;
 }
 
-static Operand reg_oper(const Instruction& in)
+static void rename_phi(Block* child, Block* parent, map<Localvar*, RenameStack>& stack)
+{
+    if (child == nullptr) return;
+
+    auto it = std::find(child->prevs.cbegin(), child->prevs.cend(), parent);
+    int p = it - child->prevs.cbegin();
+
+    for (auto& var_phi : child->phi) {
+        Localvar* var = var_phi.first;
+        Phi& phi = var_phi.second;
+        phi.r[p] = ssa_oper(var, stack[var].top());
+        phi.pre[p] = parent;
+    }
+}
+
+static Operand reg_oper(Instruction* in)
 {
     Operand r;
     r.type = Operand::REG;
-    r.value = in.addr;
+    r.reg = in;
     r.ssa_idx = -1;
     return r;
 }
 
+void Block::ssa_rename_var(map<Localvar*, RenameStack>& stack)
+{
+    for (auto& var_phi : phi)
+        var_phi.second.l = stack[var_phi.first].push();
+
+    for (Instruction* in : instr) {
+        if (in->oper[0].is_local())
+            in->oper[0].ssa_idx = stack[in->oper[0].var].top();
+        if (in->oper[1].is_local())
+            in->oper[1].ssa_idx = stack[in->oper[1].var].top();
+
+        if (in->is_move() && in->oper[1].is_local())
+            in->oper[1].ssa_idx = stack[in->oper[1].var].push();
+    }
+
+    assert(seq_next == nullptr || seq_next != br_next);
+    rename_phi(seq_next, this, stack);
+    rename_phi(br_next, this, stack);
+
+    for (Block* c : domc)
+        c->ssa_rename_var(stack);
+
+    for (Localvar* var : defs)
+        stack[var].pop();
+}
+
+
+/*
 void Function::remove_phi()
 {
     Instruction bak;
@@ -147,20 +177,6 @@ void Function::remove_phi()
     }
 }
 
-static void rename_phi(Block* child, Block* parent, map<int, RenameStack>& stack)
-{
-    if (child == nullptr) return;
-
-    auto it = std::find(child->prevs.cbegin(), child->prevs.cend(), parent);
-    int p = it - child->prevs.cbegin();
-
-    for (auto& var_phi : child->phi) {
-        int var = var_phi.first;
-        Phi& phi = var_phi.second;
-        phi.r[p] = ssa_oper(var, stack[var].top());
-    }
-}
-
 void Block::ssa_rename_var(map<int, RenameStack>& stack)
 {
     for (auto& var_phi : phi)
@@ -201,6 +217,25 @@ static inline pair<string, int> operand(const Operand& oper)
 {
     return make_pair(oper.tag, oper.ssa_idx);
 }
+*/
+
+bool Phi::is_const() const
+{
+    for (const Operand& oper : r) {
+        if (!oper.is_const()) return false;
+        if (oper.value_const != r[0].value_const) return false;
+    }
+    return true;
+}
+
+bool Operand::operator< (const Operand& o) const
+{
+    if (type < o.type) return true;
+    if (type > o.type) return false;
+    if (_value < o._value) return true;
+    if (_value > o._value) return false;
+    return ssa_idx < o.ssa_idx;
+}
 
 void Function::ssa_constant_propagate()
 {
@@ -210,46 +245,35 @@ void Function::ssa_constant_propagate()
     while (updated) {
         updated = false;
 
-        for (auto& addr_block : blocks) {
-            Block* b = addr_block.second;
-
+        for (Block* b : blocks) {
             for (auto& var_phi : b->phi) {
-                int var = var_phi.first;
+                Localvar* var = var_phi.first;
                 Phi& phi = var_phi.second;
                 assert(!phi.r.empty());
 
-                bool is_const = true;
                 for (Operand& oper : phi.r)
-                    if (!oper.is_const()) {
-                        if (const_val.count(oper) > 0)
-                            oper.to_const(const_val[oper]);
-                        else
-                            is_const = false;
-                    }
-                if (!is_const) continue;
+                    if (const_val.count(oper) > 0)
+                        oper.to_const(const_val[oper]);
 
-                for (int i = 1; i < phi.r.size(); ++i)
-                    if (phi.r[i].value != phi.r[0].value)
-                        is_const = false;
-                if (!is_const) continue;
-
-                const_val[ssa_oper(var, phi.l)] = phi.r[0].value;
-                phi.r.clear();
-                updated = true;
+                if (phi.is_const()) {
+                    const_val[ssa_oper(var, phi.l)] = phi.value();
+                    phi.clear();
+                    updated = true;
+                }
             }
 
-            for (Instruction& in : b->instr)
-                if (in.op != Opcode::NOP) {
+            for (Instruction* in : b->instr)
+                if (in->op) {
                     for (int i = 0; i < 2; ++i)
-                        if (in.isrightvalue(i) && const_val.count(in.oper[i]) > 0)
-                                in.oper[i].to_const(const_val[in.oper[i]]);
+                        if (in->isrightvalue(i) && const_val.count(in->oper[i]) > 0)
+                                in->oper[i].to_const(const_val[in->oper[i]]);
 
-                    if (in.isconst()) {
-                        long long val = in.constvalue();
+                    if (in->isconst()) {
+                        long long val = in->constvalue();
                         const_val[reg_oper(in)] = val;
-                        if (in.op == Opcode::MOVE)
-                            const_val[in.oper[1]] = val;
-                        in.erase();
+                        if (in->is_move())
+                            const_val[in->oper[1]] = val;
+                        in->erase();
                         updated = true;
                     }
                 }
@@ -257,6 +281,22 @@ void Function::ssa_constant_propagate()
     }
 }
 
+void Phi::icode(FILE* out) const
+{
+    fprintf(out, "instr %lld: phi", name);
+    for (const Operand& oper : r) {
+        if (oper.is_local()) {
+            fprintf(out, " %s$%d", oper.var->name.c_str(), oper.ssa_idx);
+        } else {
+            assert(oper.is_const());
+            fprintf(out, " %lld", oper.value_const);
+        }
+    }
+    fprintf(out, "\ninstr %lld: move (%lld) %s$%d\n", name + 1, name, r[0].var->name.c_str(), l);
+}
+
+
+/*
 void Function::ssa_licm()
 {
     map<Operand, Block*> oper2block;
@@ -415,15 +455,10 @@ void Program::compute_df()
 
 void Program::find_defs()
 {
-    for (Function* func : funcs)
-        for (const auto& addr_block : func->blocks)
-            addr_block.second->find_defs();
 }
 
 void Program::place_phi()
 {
-    for (Function* func : funcs)
-        func->place_phi();
 }
 
 void Program::remove_phi()
@@ -435,30 +470,34 @@ void Program::remove_phi()
 
 void Program::ssa_rename_var()
 {
-    for (Function* func : funcs) {
-        map<int, RenameStack> stack;
-        func->entry->ssa_rename_var(stack);
-    }
 }
 
 void Program::ssa_licm()
 {
     for (Function* func : funcs)
         func->ssa_licm();
+}*/
+
+void Program::ssa_prepare()
+{
+    for (Function* f : funcs)
+        f->entry->compute_df();
+
+    for (Function* f : funcs)
+        for (Block* b : f->blocks)
+            b->find_defs();
+
+    for (Function* f : funcs)
+        f->place_phi();
+
+    for (Function* f : funcs) {
+        map<Localvar*, RenameStack> stack;
+        f->entry->ssa_rename_var(stack);
+    }
 }
 
 void Program::ssa_constant_propagate()
 {
     for (Function* func : funcs)
         func->ssa_constant_propagate();
-}
-
-void Program::ssa_prepare()
-{
-    find_functions();
-    build_domtree();
-    compute_df();
-    find_defs();
-    place_phi();
-    ssa_rename_var();
 }
