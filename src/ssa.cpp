@@ -285,7 +285,7 @@ void Function::ssa_constant_propagate()
 void Phi::icode(FILE* out, Localvar* var) const
 {
     if (r.empty()) return;
-    fprintf(out, "instr %lld: phi", name);
+    fprintf(out, "instr %d: phi", name);
     for (const Operand& oper : r) {
         if (oper.is_local()) {
             fprintf(out, " %s$%d", oper.var->name.c_str(), oper.ssa_idx);
@@ -294,7 +294,7 @@ void Phi::icode(FILE* out, Localvar* var) const
             fprintf(out, " %lld", oper.value_const);
         }
     }
-    fprintf(out, "\ninstr %lld: move (%lld) %s$%d\n", name + 1, name, var->name.c_str(), l);
+    fprintf(out, "\ninstr %d: move (%d) %s$%d\n", name + 1, name, var->name.c_str(), l);
 }
 
 static inline map<Operand, Block*> calc_oper2block(Function* f)
